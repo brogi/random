@@ -1,7 +1,16 @@
-!/bin/bash
+#!/bin/bash
+
+# Source the vault login script to authenticate with Vault
+source ./scripts/vault-login.sh
 
 # Define the full path to the vault binary
 VAULT_PATH="/usr/local/bin/vault"  # Update with the actual path to the vault binary
+
+# Define the full path to the basename binary
+BASENAME_PATH="/usr/bin/basename"
+
+# Define the full path to the jq binary
+JQ_PATH="/usr/local/bin/jq"
 
 # Function to recursively list all secrets under a given path
 # $1: Path to list secrets under
@@ -13,34 +22,32 @@ function list_secrets_recursive() {
     echo "Listing secrets under path: ${PATH}"
 
     # List all secrets under the specified path
-    local LIST_OUTPUT
-    LIST_OUTPUT=$("${VAULT_PATH}" kv list -format=json "${PATH}")
+    local SECRET_LIST
+    SECRET_LIST=$("${VAULT_PATH}" kv list -format=json "${PATH}" | "${JQ_PATH}" -r '.[]')
 
-    # Check if the path ends with "/"
-    if [[ "${LIST_OUTPUT: -1}" == "/" ]]; then
-        # Path is a directory (contains sub-paths), so recursively process each sub-path
-        local SUB_PATHS
-        SUB_PATHS=$(echo "${LIST_OUTPUT}" | jq -r '.[]')
+    # Loop through each secret
+    for SECRET in ${SECRET_LIST}; do
+        local SECRET_PATH="${PATH}/${SECRET}"
 
-        for SUB_PATH in ${SUB_PATHS}; do
-            # Construct the full sub-path
-            local FULL_PATH="${PATH}${SUB_PATH}"
+        if "${VAULT_PATH}" kv list -format=json "${SECRET_PATH}" >/dev/null 2>&1; then
+            # If the secret path ends with "/", it indicates a nested directory, so recurse
+            list_secrets_recursive "${SECRET_PATH}" "${OUTPUT_DIR}"
+        else
+            # Otherwise, it retrieves and saves the secret data
+            echo "Reading secret data from: ${SECRET_PATH}"
+            local SECRET_DATA
+            SECRET_DATA=$("${VAULT_PATH}" kv get -format=json "${SECRET_PATH}" | "${JQ_PATH}" -r '.data')
 
-            # Recursively list secrets under the sub-path
-            list_secrets_recursive "${FULL_PATH}" "${OUTPUT_DIR}"
-        done
-    else
-        # Path is a leaf node (contains secrets), so retrieve and save secret data
-        local SECRET_DATA
-        SECRET_DATA=$("${VAULT_PATH}" kv get -format=json "${PATH}" | jq -r '.data')
+            # Extract the secret name from the path
+            local SECRET_NAME
+            SECRET_NAME=$("${BASENAME_PATH}" "${SECRET_PATH}")
 
-        # Save the secret data to a JSON file
-        local SECRET_NAME
-        SECRET_NAME=$(basename "${PATH}")  # Extract the last part of the path as the secret name
-        local OUTPUT_FILE="${OUTPUT_DIR}/${SECRET_NAME}.json"
-        echo "${SECRET_DATA}" >"${OUTPUT_FILE}"
-        echo "Secret data saved to ${OUTPUT_FILE}"
-    fi
+            # Save the secret data to a JSON file in the output directory
+            local OUTPUT_FILE="${OUTPUT_DIR}/${SECRET_NAME}.json"
+            echo "${SECRET_DATA}" >"${OUTPUT_FILE}"
+            echo "Secret data saved to ${OUTPUT_FILE}"
+        fi
+    done
 }
 
 # Define the output directory
