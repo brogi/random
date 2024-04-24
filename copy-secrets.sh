@@ -12,10 +12,16 @@ BASENAME_PATH="/usr/bin/basename"
 # Define the full path to the jq binary
 JQ_PATH="/usr/local/bin/jq"
 
+# Define the full path to the mkdir binary
+MKDIR_PATH="/bin/mkdir"
+
+# Define the full path to the dirname binary
+DIRNAME_PATH="/usr/bin/dirname"
+
 # Function to recursively list all secrets under a given path
 # $1: Path to list secrets under
 # $2: Output directory to save secret data
-# $3: Original base path for the secrets (used for path retention in JSON)
+# $3: Base path for relative directory structure (SOURCE_PATH)
 function list_secrets_recursive() {
     local PATH="$1"
     local OUTPUT_DIR="$2"
@@ -44,14 +50,17 @@ function list_secrets_recursive() {
             local SECRET_NAME
             SECRET_NAME=$("${BASENAME_PATH}" "${SECRET_PATH}")
 
-            # Save the secret data to a JSON file in the output directory
-            local RELATIVE_PATH="${SECRET_PATH#$BASE_PATH/}"
-            local OUTPUT_FILE="${OUTPUT_DIR}/${RELATIVE_PATH}.json"
-            
-            # Create directories if they don't exist
-            mkdir -p "$(dirname "${OUTPUT_FILE}")"
+            # Calculate relative path from BASE_PATH to SECRET_PATH
+            local RELATIVE_PATH="${SECRET_PATH#${BASE_PATH}/}"
 
-            # Construct JSON content with both data and original path
+            # Construct the output directory path
+            local OUTPUT_SUBDIR="$("${DIRNAME_PATH}" "${OUTPUT_DIR}/${RELATIVE_PATH}")"
+
+            # Create directories if they don't exist
+            "${MKDIR_PATH}" -p "${OUTPUT_SUBDIR}"
+
+            # Save the secret data to a JSON file in the output directory
+            local OUTPUT_FILE="${OUTPUT_DIR}/${RELATIVE_PATH}.json"
             echo "{\"data\": ${SECRET_DATA}, \"path\": \"${SECRET_PATH}\"}" >"${OUTPUT_FILE}"
             echo "Secret data saved to ${OUTPUT_FILE}"
         fi
@@ -62,7 +71,7 @@ function list_secrets_recursive() {
 OUTPUT_DIR="cert-files/working-directory"
 
 # Create the output directory if it doesn't exist
-mkdir -p "${OUTPUT_DIR}"
+"${MKDIR_PATH}" -p "${OUTPUT_DIR}"
 
 # Prompt user for source path
 read -p "Enter source path (e.g., kv/sky): " SOURCE_PATH
@@ -76,7 +85,7 @@ if [ -z "${SOURCE_PATH}" ]; then
 fi
 
 # Call the function to recursively list secrets under the specified path
-# Pass the SOURCE_PATH itself as the base path for path retention
+# Pass the SOURCE_PATH itself as the base path for path retention in output directory
 list_secrets_recursive "${SOURCE_PATH}" "${OUTPUT_DIR}" "${SOURCE_PATH}"
 
 echo "All secrets from ${SOURCE_PATH} and its nested paths saved to ${OUTPUT_DIR} successfully."
