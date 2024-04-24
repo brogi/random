@@ -4,7 +4,7 @@
 source ./scripts/vault-login.sh
 
 # Define the full path to the vault binary
-VAULT_PATH="/usr/local/bin/vault"  # Update with the actual path to the vault binary
+VAULT_PATH="/usr/local/bin/vault"
 
 # Define the full path to the jq binary
 JQ_PATH="/usr/local/bin/jq"
@@ -15,9 +15,11 @@ MKDIR_PATH="/bin/mkdir"
 # Function to recursively list all secrets under a given path
 # $1: Path to list secrets under
 # $2: Output directory to save secret data
+# $3: Base path for relative directory structure (SOURCE_PATH)
 function list_secrets_recursive() {
     local PATH="$1"
     local OUTPUT_DIR="$2"
+    local BASE_PATH="$3"
 
     echo "Listing secrets under path: ${PATH}"
 
@@ -31,23 +33,24 @@ function list_secrets_recursive() {
 
         if "${VAULT_PATH}" kv list -format=json "${SECRET_PATH}" >/dev/null 2>&1; then
             # If the secret path ends with "/", it indicates a nested directory, so recurse
-            list_secrets_recursive "${SECRET_PATH}" "${OUTPUT_DIR}"
+            list_secrets_recursive "${SECRET_PATH}" "${OUTPUT_DIR}" "${BASE_PATH}"
         else
             # Otherwise, retrieve and save the secret data
             echo "Reading secret data from: ${SECRET_PATH}"
             local SECRET_DATA
             SECRET_DATA=$("${VAULT_PATH}" kv get -format=json "${SECRET_PATH}" | "${JQ_PATH}" -r '.data')
 
-            # Calculate relative path from SOURCE_PATH to SECRET_PATH
-            local RELATIVE_PATH="${SECRET_PATH#${SOURCE_PATH}/}"
+            # Calculate relative path from BASE_PATH to SECRET_PATH
+            local RELATIVE_PATH="${SECRET_PATH#${BASE_PATH}/}"
 
-            # Construct the output file path
+            # Construct the output directory path
+            local OUTPUT_SUBDIR="${OUTPUT_DIR}/${RELATIVE_PATH%/*}"
+
+            # Create directories if they don't exist
+            "${MKDIR_PATH}" -p "${OUTPUT_SUBDIR}"
+
+            # Save the secret data to a JSON file in the output directory
             local OUTPUT_FILE="${OUTPUT_DIR}/${RELATIVE_PATH}.json"
-
-            # Create parent directories if they don't exist
-            "${MKDIR_PATH}" -p "$(dirname "${OUTPUT_FILE}")"
-
-            # Save the secret data to a JSON file
             echo "{\"data\": ${SECRET_DATA}, \"path\": \"${SECRET_PATH}\"}" >"${OUTPUT_FILE}"
             echo "Secret data saved to ${OUTPUT_FILE}"
         fi
@@ -62,7 +65,6 @@ BASE_OUTPUT_DIR="cert-files/working-directory"
 
 # Prompt user for source path
 read -p "Enter source path (e.g., kv/sky): " SOURCE_PATH
-
 echo "Source path entered: ${SOURCE_PATH}"
 
 # Validate source path
@@ -71,10 +73,11 @@ if [ -z "${SOURCE_PATH}" ]; then
     exit 1
 fi
 
-# Define the full output directory path
+# Define the full output directory including SOURCE_PATH
 OUTPUT_DIR="${BASE_OUTPUT_DIR}/${SOURCE_PATH}"
 
 # Call the function to recursively list secrets under the specified path
-list_secrets_recursive "${SOURCE_PATH}" "${OUTPUT_DIR}"
+# Pass the SOURCE_PATH itself as the base path for path retention in output directory
+list_secrets_recursive "${SOURCE_PATH}" "${OUTPUT_DIR}" "${SOURCE_PATH}"
 
 echo "All secrets from ${SOURCE_PATH} and its nested paths saved to ${OUTPUT_DIR} successfully."
