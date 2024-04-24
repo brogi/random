@@ -4,19 +4,13 @@
 source ./scripts/vault-login.sh
 
 # Define the full path to the vault binary
-VAULT_PATH="/usr/local/bin/vault"  # Update with the actual path to the vault binary
-
-# Define the full path to the basename binary
-BASENAME_PATH="/usr/bin/basename"
+VAULT_PATH="/usr/local/bin/vault"
 
 # Define the full path to the jq binary
 JQ_PATH="/usr/local/bin/jq"
 
 # Define the full path to the mkdir binary
 MKDIR_PATH="/bin/mkdir"
-
-# Define the full path to the dirname binary
-DIRNAME_PATH="/usr/bin/dirname"
 
 # Function to recursively list all secrets under a given path
 # $1: Path to list secrets under
@@ -41,7 +35,7 @@ function list_secrets_recursive() {
             # If the secret path ends with "/", it indicates a nested directory, so recurse
             list_secrets_recursive "${SECRET_PATH}" "${OUTPUT_DIR}" "${BASE_PATH}"
         else
-            # Otherwise, it retrieves and saves the secret data
+            # Otherwise, retrieve and save the secret data
             echo "Reading secret data from: ${SECRET_PATH}"
             local SECRET_DATA
             SECRET_DATA=$("${VAULT_PATH}" kv get -format=json "${SECRET_PATH}" | "${JQ_PATH}" -r '.data')
@@ -49,14 +43,17 @@ function list_secrets_recursive() {
             # Calculate relative path from BASE_PATH to SECRET_PATH
             local RELATIVE_PATH="${SECRET_PATH#${BASE_PATH}/}"
 
-            # Construct the output directory path including SOURCE_PATH
-            local OUTPUT_SUBDIR="${OUTPUT_DIR}/${BASE_PATH}/${RELATIVE_PATH%/*}"
+            # Construct the output directory path
+            local OUTPUT_SUBDIR="${OUTPUT_DIR}/${RELATIVE_PATH%/*}"
 
             # Create directories if they don't exist
             "${MKDIR_PATH}" -p "${OUTPUT_SUBDIR}"
 
+            # Extract filename from SECRET_PATH
+            local SECRET_FILENAME="${SECRET_PATH##*/}"
+
             # Save the secret data to a JSON file in the output directory
-            local OUTPUT_FILE="${OUTPUT_DIR}/${BASE_PATH}/${RELATIVE_PATH}.json"
+            local OUTPUT_FILE="${OUTPUT_SUBDIR}/${SECRET_FILENAME}.json"
             echo "{\"data\": ${SECRET_DATA}, \"path\": \"${SECRET_PATH}\"}" >"${OUTPUT_FILE}"
             echo "Secret data saved to ${OUTPUT_FILE}"
         fi
