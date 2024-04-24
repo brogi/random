@@ -46,32 +46,28 @@ function list_secrets_recursive() {
             local SECRET_DATA
             SECRET_DATA=$("${VAULT_PATH}" kv get -format=json "${SECRET_PATH}" | "${JQ_PATH}" -r '.data')
 
-            # Extract the secret name from the path
-            local SECRET_NAME
-            SECRET_NAME=$("${BASENAME_PATH}" "${SECRET_PATH}")
-
             # Calculate relative path from BASE_PATH to SECRET_PATH
             local RELATIVE_PATH="${SECRET_PATH#${BASE_PATH}/}"
 
-            # Construct the output directory path
-            local OUTPUT_SUBDIR="$("${DIRNAME_PATH}" "${OUTPUT_DIR}/${RELATIVE_PATH}")"
+            # Construct the output directory path including SOURCE_PATH
+            local OUTPUT_SUBDIR="${OUTPUT_DIR}/${BASE_PATH}/${RELATIVE_PATH%/*}"
 
             # Create directories if they don't exist
             "${MKDIR_PATH}" -p "${OUTPUT_SUBDIR}"
 
             # Save the secret data to a JSON file in the output directory
-            local OUTPUT_FILE="${OUTPUT_DIR}/${RELATIVE_PATH}.json"
+            local OUTPUT_FILE="${OUTPUT_DIR}/${BASE_PATH}/${RELATIVE_PATH}.json"
             echo "{\"data\": ${SECRET_DATA}, \"path\": \"${SECRET_PATH}\"}" >"${OUTPUT_FILE}"
             echo "Secret data saved to ${OUTPUT_FILE}"
         fi
     done
 }
 
-# Define the output directory
-OUTPUT_DIR="cert-files/working-directory"
+# Define the base output directory
+BASE_OUTPUT_DIR="cert-files/working-directory"
 
-# Create the output directory if it doesn't exist
-"${MKDIR_PATH}" -p "${OUTPUT_DIR}"
+# Create the base output directory if it doesn't exist
+"${MKDIR_PATH}" -p "${BASE_OUTPUT_DIR}"
 
 # Prompt user for source path
 read -p "Enter source path (e.g., kv/sky): " SOURCE_PATH
@@ -83,6 +79,9 @@ if [ -z "${SOURCE_PATH}" ]; then
     echo "Error: Source path is empty. Please provide a valid path."
     exit 1
 fi
+
+# Define the full output directory including SOURCE_PATH
+OUTPUT_DIR="${BASE_OUTPUT_DIR}/${SOURCE_PATH}"
 
 # Call the function to recursively list secrets under the specified path
 # Pass the SOURCE_PATH itself as the base path for path retention in output directory
