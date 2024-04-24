@@ -49,11 +49,8 @@ function list_secrets_recursive() {
             # Create directories if they don't exist
             "${MKDIR_PATH}" -p "${OUTPUT_SUBDIR}"
 
-            # Extract filename from SECRET_PATH
-            local SECRET_FILENAME="${SECRET_PATH##*/}"
-
             # Save the secret data to a JSON file in the output directory
-            local OUTPUT_FILE="${OUTPUT_SUBDIR}/${SECRET_FILENAME}.json"
+            local OUTPUT_FILE="${OUTPUT_DIR}/${RELATIVE_PATH}.json"
             echo "{\"data\": ${SECRET_DATA}, \"path\": \"${SECRET_PATH}\"}" >"${OUTPUT_FILE}"
             echo "Secret data saved to ${OUTPUT_FILE}"
         fi
