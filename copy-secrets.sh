@@ -49,14 +49,14 @@ function list_secrets_recursive() {
             # Calculate relative path from BASE_PATH to SECRET_PATH
             local RELATIVE_PATH="${SECRET_PATH#${BASE_PATH}/}"
 
-            # Construct the output directory path including SOURCE_PATH
-            local OUTPUT_SUBDIR="${OUTPUT_DIR}/${BASE_PATH}/${RELATIVE_PATH%/*}"
+            # Construct the output directory path
+            local OUTPUT_SUBDIR="${OUTPUT_DIR}/${RELATIVE_PATH%/*}"
 
             # Create directories if they don't exist
             "${MKDIR_PATH}" -p "${OUTPUT_SUBDIR}"
 
             # Save the secret data to a JSON file in the output directory
-            local OUTPUT_FILE="${OUTPUT_DIR}/${BASE_PATH}/${RELATIVE_PATH}.json"
+            local OUTPUT_FILE="${OUTPUT_SUBDIR}/${BASENAME_PATH "${SECRET_PATH}".json"
             echo "{\"data\": ${SECRET_DATA}, \"path\": \"${SECRET_PATH}\"}" >"${OUTPUT_FILE}"
             echo "Secret data saved to ${OUTPUT_FILE}"
         fi
