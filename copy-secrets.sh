@@ -15,9 +15,11 @@ JQ_PATH="/usr/local/bin/jq"
 # Function to recursively list all secrets under a given path
 # $1: Path to list secrets under
 # $2: Output directory to save secret data
+# $3: Original base path for the secrets (used for path retention in JSON)
 function list_secrets_recursive() {
     local PATH="$1"
     local OUTPUT_DIR="$2"
+    local BASE_PATH="$3"
 
     echo "Listing secrets under path: ${PATH}"
 
@@ -31,7 +33,7 @@ function list_secrets_recursive() {
 
         if "${VAULT_PATH}" kv list -format=json "${SECRET_PATH}" >/dev/null 2>&1; then
             # If the secret path ends with "/", it indicates a nested directory, so recurse
-            list_secrets_recursive "${SECRET_PATH}" "${OUTPUT_DIR}"
+            list_secrets_recursive "${SECRET_PATH}" "${OUTPUT_DIR}" "${BASE_PATH}"
         else
             # Otherwise, it retrieves and saves the secret data
             echo "Reading secret data from: ${SECRET_PATH}"
@@ -43,8 +45,14 @@ function list_secrets_recursive() {
             SECRET_NAME=$("${BASENAME_PATH}" "${SECRET_PATH}")
 
             # Save the secret data to a JSON file in the output directory
-            local OUTPUT_FILE="${OUTPUT_DIR}/${SECRET_NAME}.json"
-            echo "${SECRET_DATA}" >"${OUTPUT_FILE}"
+            local RELATIVE_PATH="${SECRET_PATH#$BASE_PATH/}"
+            local OUTPUT_FILE="${OUTPUT_DIR}/${RELATIVE_PATH}.json"
+            
+            # Create directories if they don't exist
+            mkdir -p "$(dirname "${OUTPUT_FILE}")"
+
+            # Construct JSON content with both data and original path
+            echo "{\"data\": ${SECRET_DATA}, \"path\": \"${SECRET_PATH}\"}" >"${OUTPUT_FILE}"
             echo "Secret data saved to ${OUTPUT_FILE}"
         fi
     done
@@ -68,6 +76,7 @@ if [ -z "${SOURCE_PATH}" ]; then
 fi
 
 # Call the function to recursively list secrets under the specified path
-list_secrets_recursive "${SOURCE_PATH}" "${OUTPUT_DIR}"
+# Pass the SOURCE_PATH itself as the base path for path retention
+list_secrets_recursive "${SOURCE_PATH}" "${OUTPUT_DIR}" "${SOURCE_PATH}"
 
 echo "All secrets from ${SOURCE_PATH} and its nested paths saved to ${OUTPUT_DIR} successfully."
