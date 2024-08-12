@@ -1,0 +1,33 @@
+import boto3
+
+def lambda_handler(event, context):
+    ec2 = boto3.client('ec2')
+    
+    # Specify the VolumeId of the volume you want to modify
+    volume_id = 'your-volume-id'  # Replace with your specific VolumeId
+    
+    # Describe the volume to confirm its type and details
+    response = ec2.describe_volumes(
+        VolumeIds=[volume_id]
+    )
+    
+    volume = response['Volumes'][0]
+    
+    if volume['VolumeType'] == 'gp2':
+        print(f"Modifying volume {volume_id} from gp2 to gp3")
+        
+        # Modify the volume to gp3
+        ec2.modify_volume(
+            VolumeId=volume_id,
+            VolumeType='gp3'
+        )
+        
+        return {
+            'statusCode': 200,
+            'body': f"Successfully modified volume {volume_id} to gp3"
+        }
+    else:
+        return {
+            'statusCode': 400,
+            'body': f"Volume {volume_id} is not of type gp2, it is {volume['VolumeType']}"
+        }
