@@ -1,0 +1,64 @@
+#!/bin/bash
+
+# Prompt for certificate file paths and other details
+read -p "Enter the path to your public certificate file (e.g., /path/to/public_cert.pem): " PUBLIC_CERTIFICATE_PATH
+read -p "Enter the path to your private key file (e.g., /path/to/private_key.pem): " PRIVATE_KEY_PATH
+read -p "Enter the path to your certificate chain file (optional, press enter to skip): " CERTIFICATE_CHAIN_PATH
+read -p "Enter the base name for your server certificate (e.g., myServerCertificate): " CERT_NAME
+
+# Check if the public certificate file exists
+if [ ! -f "$PUBLIC_CERTIFICATE_PATH" ]; then
+  echo "Error: Public certificate file not found at $PUBLIC_CERTIFICATE_PATH"
+  exit 1
+fi
+
+# Check if the private key file exists
+if [ ! -f "$PRIVATE_KEY_PATH" ]; then
+  echo "Error: Private key file not found at $PRIVATE_KEY_PATH"
+  exit 1
+fi
+
+# Check if the certificate chain file exists, if provided
+if [ -n "$CERTIFICATE_CHAIN_PATH" ] && [ ! -f "$CERTIFICATE_CHAIN_PATH" ]; then
+  echo "Error: Certificate chain file not found at $CERTIFICATE_CHAIN_PATH"
+  exit 1
+fi
+
+# Get the expiration date from the certificate
+expiration_date=$(openssl x509 -enddate -noout -in "$PUBLIC_CERTIFICATE_PATH" | cut -d= -f2)
+
+# Convert the expiration date to MM-DD-YY format
+formatted_exp_date=$(date -d "$expiration_date" +%m-%d-%y)
+
+# Set the server certificate name with the formatted date
+server_certificate_name="${CERT_NAME}-EXP-${formatted_exp_date}"
+
+# Prompt for the server certificate name confirmation
+echo "Your certificate name for the upload will be $server_certificate_name. Is this correct? (yes/no)"
+read RESPONSE
+
+if [[ "$RESPONSE" != "yes" ]]; then
+    read -p "Please enter the correct name for your server certificate: " server_certificate_name
+fi
+
+# Upload the certificate
+if [ -z "$CERTIFICATE_CHAIN_PATH" ]; then
+  aws iam upload-server-certificate \
+    --server-certificate-name "$server_certificate_name" \
+    --certificate-body "file://$PUBLIC_CERTIFICATE_PATH" \
+    --private-key "file://$PRIVATE_KEY_PATH"
+else
+  aws iam upload-server-certificate \
+    --server-certificate-name "$server_certificate_name" \
+    --certificate-body "file://$PUBLIC_CERTIFICATE_PATH" \
+    --private-key "file://$PRIVATE_KEY_PATH" \
+    --certificate-chain "file://$CERTIFICATE_CHAIN_PATH"
+fi
+
+# Check if the upload was successful
+if [ $? -eq 0 ]; then
+  echo "Certificate '$server_certificate_name' uploaded successfully."
+else
+  echo "Error: Failed to upload the certificate."
+  exit 1
+fi
