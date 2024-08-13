@@ -62,3 +62,9 @@ else
   echo "Error: Failed to upload the certificate."
   exit 1
 fi
+
+
+# Convert the expiration date to MM-DD-YY format
+formatted_exp_date=$(date -jf "%b %d %T %Y %Z" "$expiration_date" +"%m-%d-%y" 2>/dev/null || \
+openssl x509 -in "$PUBLIC_CERTIFICATE_PATH" -noout -enddate | \
+awk -F'=' '{print $2}' | date +"%m-%d-%y")
