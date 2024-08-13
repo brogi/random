@@ -28,3 +28,47 @@ if [ $? -eq 0 ]; then
 else
     echo "Failed to connect to AWS. Please check your credentials and network connectivity."
 fi
+
+
+#!/bin/sh
+
+# Prompt the user to paste all credentials at once
+echo "Please paste all AWS credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN) as a single block:"
+echo "Example:"
+echo "set AWS_ACCESS_KEY_ID=your_access_key_id"
+echo "set AWS_SECRET_ACCESS_KEY=your_secret_access_key"
+echo "set AWS_SESSION_TOKEN=your_session_token"
+echo "End with Ctrl+D (or Ctrl+Z on Windows) after pasting."
+
+# Read multi-line input
+credentials=$(cat)
+
+# Extract individual credentials using parameter expansion
+AWS_ACCESS_KEY_ID=$(echo "$credentials" | grep "AWS_ACCESS_KEY_ID" | cut -d '=' -f 2)
+AWS_SECRET_ACCESS_KEY=$(echo "$credentials" | grep "AWS_SECRET_ACCESS_KEY" | cut -d '=' -f 2)
+AWS_SESSION_TOKEN=$(echo "$credentials" | grep "AWS_SESSION_TOKEN" | cut -d '=' -f 2)
+
+# Check if any credentials are missing
+if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$AWS_SESSION_TOKEN" ]; then
+    echo "Error: One or more AWS credentials are missing. Please ensure all credentials are pasted correctly."
+    exit 1
+fi
+
+# Configure AWS CLI with the provided credentials
+aws configure set aws_access_key_id "$AWS_ACCESS_KEY_ID"
+aws configure set aws_secret_access_key "$AWS_SECRET_ACCESS_KEY"
+aws configure set aws_session_token "$AWS_SESSION_TOKEN"
+
+echo "AWS CLI has been configured successfully."
+
+# Test the AWS CLI connectivity by getting caller identity
+echo "Testing AWS CLI connectivity..."
+aws sts get-caller-identity --output text
+
+# Check the exit status of the previous command
+if [ $? -eq 0 ]; then
+    echo "AWS CLI is configured and connected successfully."
+else
+    echo "Failed to connect to AWS. Please check your credentials and network connectivity."
+fi
+
