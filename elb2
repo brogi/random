@@ -1,0 +1,95 @@
+#!/bin/bash
+
+# Assuming you have set up authentication to Vault
+# Ensure that VAULT_ADDR and VAULT_TOKEN are set as environment variables
+
+# Prompt for environment
+read -p "Enter the environment (e.g., dev, test, prod): " ENVIRONMENT
+
+# Use the cert_name variable provided from elsewhere in the script
+# This script assumes cert_name is already defined in lowercase
+# Example: cert_name="myServerCertificate"
+
+# Define the base path for the certificates in Vault
+VAULT_BASE_PATH="kv/certs/$ENVIRONMENT/internal-$ENVIRONMENT-text/$cert_name"
+
+echo "Fetching certificate files for $cert_name from Vault path $VAULT_BASE_PATH..."
+
+# Fetch the certificate, key, and chain from Vault
+PUBLIC_CERTIFICATE_CONTENT=$(vault kv get -field=cert "$VAULT_BASE_PATH")
+PRIVATE_KEY_CONTENT=$(vault kv get -field=key "$VAULT_BASE_PATH")
+CERTIFICATE_CHAIN_CONTENT=$(vault kv get -field=chain "$VAULT_BASE_PATH" 2>/dev/null)
+
+# Create temporary files with the correct extensions
+PUBLIC_CERTIFICATE_PATH=$(mktemp --suffix=.pem)
+PRIVATE_KEY_PATH=$(mktemp --suffix=.key)
+CERTIFICATE_CHAIN_PATH=$(mktemp --suffix=.pem)
+
+# Write the fetched content to the temporary files
+echo "$PUBLIC_CERTIFICATE_CONTENT" > "$PUBLIC_CERTIFICATE_PATH"
+echo "$PRIVATE_KEY_CONTENT" > "$PRIVATE_KEY_PATH"
+if [ -n "$CERTIFICATE_CHAIN_CONTENT" ]; then
+    echo "$CERTIFICATE_CHAIN_CONTENT" > "$CERTIFICATE_CHAIN_PATH"
+else
+    echo "Error: Certificate chain file is required but was not found."
+    rm -f "$PUBLIC_CERTIFICATE_PATH" "$PRIVATE_KEY_PATH" "$CERTIFICATE_CHAIN_PATH"
+    exit 1
+fi
+
+# Check if the public certificate file exists
+if [ ! -f "$PUBLIC_CERTIFICATE_PATH" ]; then
+  echo "Error: Public certificate file not found or empty."
+  rm -f "$PUBLIC_CERTIFICATE_PATH" "$PRIVATE_KEY_PATH" "$CERTIFICATE_CHAIN_PATH"
+  exit 1
+fi
+
+# Check if the private key file exists
+if [ ! -f "$PRIVATE_KEY_PATH" ]; then
+  echo "Error: Private key file not found or empty."
+  rm -f "$PUBLIC_CERTIFICATE_PATH" "$PRIVATE_KEY_PATH" "$CERTIFICATE_CHAIN_PATH"
+  exit 1
+fi
+
+# Check if the certificate chain file exists
+if [ ! -f "$CERTIFICATE_CHAIN_PATH" ]; then
+  echo "Error: Certificate chain file not found or empty."
+  rm -f "$PUBLIC_CERTIFICATE_PATH" "$PRIVATE_KEY_PATH" "$CERTIFICATE_CHAIN_PATH"
+  exit 1
+fi
+
+# Get the expiration date from the certificate
+EXPIRATION_DATE=$(openssl x509 -enddate -noout -in "$PUBLIC_CERTIFICATE_PATH" | cut -d= -f2)
+
+# Convert the expiration date to MM-DD-YY format
+FORMATTED_EXP_DATE=$(date -jf "%b %d %T %Y %Z" "$EXPIRATION_DATE" +"%m-%d-%y" 2>/dev/null || \
+openssl x509 -in "$PUBLIC_CERTIFICATE_PATH" -noout -enddate | \
+awk -F'=' '{print $2}' | date +"%m-%d-%y")
+
+# Set the server certificate name with the formatted date
+SERVER_CERTIFICATE_NAME="${cert_name}-EXP-${FORMATTED_EXP_DATE}"
+
+# Prompt for the server certificate name confirmation
+echo "Your certificate name for the upload will be $SERVER_CERTIFICATE_NAME. Is this correct? (yes/no)"
+read RESPONSE
+
+if [[ "$RESPONSE" != "yes" ]]; then
+    read -p "Please enter the correct name for your server certificate: " SERVER_CERTIFICATE_NAME
+fi
+
+# Upload the certificate to AWS
+aws iam upload-server-certificate \
+  --server-certificate-name "$SERVER_CERTIFICATE_NAME" \
+  --certificate-body "file://$PUBLIC_CERTIFICATE_PATH" \
+  --private-key "file://$PRIVATE_KEY_PATH" \
+  --certificate-chain "file://$CERTIFICATE_CHAIN_PATH"
+
+# Check if the upload was successful
+if [ $? -eq 0 ]; then
+  echo "Certificate '$SERVER_CERTIFICATE_NAME' uploaded successfully."
+else
+  echo "Error: Failed to upload the certificate."
+  exit 1
+fi
+
+# Clean up temporary files
+rm -f "$PUBLIC_CERTIFICATE_PATH" "$PRIVATE_KEY_PATH" "$CERTIFICATE_CHAIN_PATH"
