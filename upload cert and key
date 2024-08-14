@@ -1,22 +1,47 @@
 #!/bin/bash
 
+
 # Define the base path for the certificates in Vault
 VAULT_BASE_PATH="kv/certs/$cert_name"
 
-# Prompt for the certificate and key contents
-read -p "Enter the new public certificate content: " certificate_file
-read -p "Enter the new private key content: " private_key_file
+# Assuming certificate_file is defined in another script and passed in
+#echo "Certificate file path is $certificate_file"
+
+# Prompt for the file path of the private key
+read -p "Enter the file path for the new private key: " private_key_file
 
 # Pull the certificate chain content from Vault
 certificate_chain_file=$(vault kv get -field=chain "kv/certs/DHS-Treasury-G2-chain")
 
+# Read the contents of the certificate and key files
+if [[ -f "$certificate_file" ]]; then
+  certificate_content=$(cat "$certificate_file")
+else
+  echo "Error: Public certificate file not found at $certificate_file"
+  exit 1
+fi
+
+if [[ -f "$private_key_file" ]]; then
+  private_key_content=$(cat "$private_key_file")
+else
+  echo "Error: Private key file not found at $private_key_file"
+  exit 1
+fi
+
 # Check if any of the contents are empty and prompt again if they are
-while [[ -z "$certificate_file" || -z "$private_key_file" || -z "$certificate_chain_file" ]]; do
-  if [[ -z "$certificate_file" ]]; then
-    read -p "Public certificate content cannot be empty. Please re-enter: " certificate_file
+while [[ -z "$certificate_content" || -z "$private_key_content" || -z "$certificate_chain_file" ]]; do
+  if [[ -z "$certificate_content" ]]; then
+    echo "Error: Public certificate content is empty. Check the certificate file."
+    exit 1
   fi
-  if [[ -z "$private_key_file" ]]; then
-    read -p "Private key content cannot be empty. Please re-enter: " private_key_file
+  if [[ -z "$private_key_content" ]]; then
+    read -p "Private key file content is empty. Please re-enter the file path: " private_key_file
+    if [[ -f "$private_key_file" ]]; then
+      private_key_content=$(cat "$private_key_file")
+    else
+      echo "Error: Private key file not found at $private_key_file"
+      exit 1
+    fi
   fi
   if [[ -z "$certificate_chain_file" ]]; then
     echo "Error: Certificate chain content could not be retrieved from Vault. Please check the path or the Vault configuration."
@@ -25,7 +50,10 @@ while [[ -z "$certificate_file" || -z "$private_key_file" || -z "$certificate_ch
 done
 
 # Write the contents to Vault
-vault kv put "$VAULT_BASE_PATH" cert="$certificate_file" key="$private_key_file" chain="$certificate_chain_file"
+vault kv put "$VAULT_BASE_PATH" \
+  cert="$certificate_content" \
+  key="$private_key_content" \
+  chain="$certificate_chain_file"
 
 # Check if the operation was successful
 if [ $? -eq 0 ]; then
