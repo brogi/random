@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# Define the base path for the certificates in Vault
+VAULT_BASE_PATH="kv/certs/$cert_name"
+
+# Prompt for the certificate and key contents
+read -p "Enter the new public certificate content: " certificate_file
+read -p "Enter the new private key content: " private_key_file
+
+# Pull the certificate chain content from Vault
+certificate_chain_file=$(vault kv get -field=chain "kv/certs/DHS-Treasury-G2-chain")
+
+# Check if any of the contents are empty and prompt again if they are
+while [[ -z "$certificate_file" || -z "$private_key_file" || -z "$certificate_chain_file" ]]; do
+  if [[ -z "$certificate_file" ]]; then
+    read -p "Public certificate content cannot be empty. Please re-enter: " certificate_file
+  fi
+  if [[ -z "$private_key_file" ]]; then
+    read -p "Private key content cannot be empty. Please re-enter: " private_key_file
+  fi
+  if [[ -z "$certificate_chain_file" ]]; then
+    echo "Error: Certificate chain content could not be retrieved from Vault. Please check the path or the Vault configuration."
+    exit 1
+  fi
+done
+
+# Write the contents to Vault
+vault kv put "$VAULT_BASE_PATH" cert="$certificate_file" key="$private_key_file" chain="$certificate_chain_file"
+
+# Check if the operation was successful
+if [ $? -eq 0 ]; then
+  echo "Successfully updated the secret for $cert_name at path $VAULT_BASE_PATH."
+else
+  echo "Error: Failed to update the secret."
+  exit 1
+fi
