@@ -75,3 +75,8 @@ if [[ "$cert_modulus" != "$key_modulus" ]]; then
   echo "Error: Modulus of certificate and private key do not match."
   exit 1
 fi
+
+
+# Print the AWS CLI command
+echo "The AWS CLI command that will be executed is:"
+echo "$aws_command"
