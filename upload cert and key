@@ -62,3 +62,16 @@ else
   echo "Error: Failed to update the secret."
   exit 1
 fi
+
+
+
+
+# Extract modulus from certificate and private key
+cert_modulus=$(openssl x509 -noout -modulus -in "$certificate_file" | openssl md5)
+key_modulus=$(openssl rsa -noout -modulus -in "$private_key_file" | openssl md5)
+
+# Compare moduli
+if [[ "$cert_modulus" != "$key_modulus" ]]; then
+  echo "Error: Modulus of certificate and private key do not match."
+  exit 1
+fi
