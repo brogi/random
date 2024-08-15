@@ -77,6 +77,9 @@ if [[ "$cert_modulus" != "$key_modulus" ]]; then
 fi
 
 
+# AWS CLI command to upload the server certificate
+aws_command="aws iam upload-server-certificate --server-certificate-name $cert_name --certificate-body file://$certificate_file --private-key file://$private_key_file --certificate-chain file://$certificate_chain_file"
+
 # Print the AWS CLI command
 echo "The AWS CLI command that will be executed is:"
 echo "$aws_command"
