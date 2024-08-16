@@ -101,3 +101,4 @@ echo "Common Name (CN) using awk: $cn"
 cn=$(echo "$subject" | sed -n 's/.*CN=\([^/]*\).*/\1/p')
 echo "Common Name (CN) using sed: $cn"
 
+openssl x509 -in "$certificatefile" -noout -subject | cut -d'CN=' -f2 | cut -d'/' -f1
