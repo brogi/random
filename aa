@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Prompt for the file path of the public certificate
+read -p "Enter the file path for the public certificate: " certificate_file
+
+# Remove the extension from the certificate file to derive cert_name
+cert_name=$(basename "$certificate_file" | sed 's/\.[^.]*$//')
+
+# Prompt for the file path of the private key
+read -p "Enter the file path for the private key: " private_key_file
+
+# Prompt for the file path of the certificate chain
+read -p "Enter the file path for the certificate chain: " certificate_chain_file
+
+# Extract expiration date from the certificate
+expiration_date=$(openssl x509 -noout -enddate -in "$certificate_file" | sed "s/^notAfter=//")
+
+# Convert expiration date to mm-dd-yy format
+formatted_exp_date=$(date -d "$expiration_date" +"%m-%d-%y")
+
+# Define the server certificate name with expiration date
+server_certificate_name="${cert_name}-EXP-${formatted_exp_date}"
+
+# Extract modulus from certificate and private key
+cert_modulus=$(openssl x509 -noout -modulus -in "$certificate_file" | openssl md5)
+key_modulus=$(openssl rsa -noout -modulus -in "$private_key_file" | openssl md5)
+
+# Compare moduli
+if [[ "$cert_modulus" != "$key_modulus" ]]; then
+  echo "Error: Modulus of certificate and private key do not match."
+  exit 1
+fi
+
+# Define the AWS CLI command to upload the server certificate
+aws_command="aws iam upload-server-certificate --server-certificate-name $server_certificate_name --certificate-body file://$certificate_file --private-key file://$private_key_file --certificate-chain file://$certificate_chain_file"
+
+# Print the AWS CLI command
+echo "The AWS CLI command that you need to execute is:"
+echo "$aws_command"
