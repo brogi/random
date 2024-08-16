@@ -106,3 +106,6 @@ openssl x509 -in "$certificatefile" -noout -subject | cut -d'CN=' -f2 | cut -d'/
 cn=$(openssl x509 -in "$certificatefile" -noout -subject | tr ' ' '\n' | grep '^CN=' | cut -d'=' -f2)
 
 openssl x509 -in "$certificatefile" -noout -subject | grep -o 'CN=[^,]*' | cut -d'=' -f2
+
+openssl x509 -in "$certificatefile" -noout -subject | grep -o 'CN = [^,]*' | tr -d ' ' | cut -d'=' -f2
+
