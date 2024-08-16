@@ -83,3 +83,7 @@ aws_command="aws iam upload-server-certificate --server-certificate-name $cert_n
 # Print the AWS CLI command
 echo "The AWS CLI command that will be executed is:"
 echo "$aws_command"
+
+
+
+cn=$(openssl x509 -in "$certificatefile" -noout -subject | grep -oP '(?<=CN=).*?(?=/|$)')
