@@ -15,11 +15,11 @@ read -p "Enter the file path for the certificate chain: " certificate_chain_file
 # Extract expiration date from the certificate
 expiration_date=$(openssl x509 -noout -enddate -in "$certificate_file" | sed "s/^notAfter=//")
 
-# Convert expiration date to mm-dd-yy format
-formatted_exp_date=$(date -d "$expiration_date" +"%m-%d-%y")
+# Convert expiration date to mm-dd-yy format using macOS-compatible date command
+expiration_date_formatted=$(date -j -f "%b %d %Y %H:%M:%S %Z" "$expiration_date" +"%m-%d-%y")
 
 # Define the server certificate name with expiration date
-server_certificate_name="${cert_name}-EXP-${formatted_exp_date}"
+server_certificate_name="${cert_name}-EXP-${expiration_date_formatted}"
 
 # Extract modulus from certificate and private key
 cert_modulus=$(openssl x509 -noout -modulus -in "$certificate_file" | openssl md5)
