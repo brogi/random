@@ -102,3 +102,6 @@ cn=$(echo "$subject" | sed -n 's/.*CN=\([^/]*\).*/\1/p')
 echo "Common Name (CN) using sed: $cn"
 
 openssl x509 -in "$certificatefile" -noout -subject | cut -d'CN=' -f2 | cut -d'/' -f1
+
+cn=$(openssl x509 -in "$certificatefile" -noout -subject | tr ' ' '\n' | grep '^CN=' | cut -d'=' -f2)
+
