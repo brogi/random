@@ -87,3 +87,4 @@ echo "$aws_command"
 
 
 cn=$(openssl x509 -in "$certificatefile" -noout -subject | grep -oP '(?<=CN=).*?(?=/|$)')
+openssl x509 -in "$certificatefile" -noout -subject | awk -F'CN=' '{print $2}' | awk -F'/' '{print $1}'
