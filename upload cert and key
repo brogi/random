@@ -88,3 +88,16 @@ echo "$aws_command"
 
 cn=$(openssl x509 -in "$certificatefile" -noout -subject | grep -oP '(?<=CN=).*?(?=/|$)')
 openssl x509 -in "$certificatefile" -noout -subject | awk -F'CN=' '{print $2}' | awk -F'/' '{print $1}'
+
+# Method 1: Using grep and sed to extract CN
+cn=$(echo "$subject" | grep -oP '(?<=CN=).*?(?=/|$)')
+echo "Common Name (CN) using grep: $cn"
+
+# Method 2: Using awk to extract CN
+cn=$(echo "$subject" | awk -F'CN=' '{print $2}' | awk -F'/' '{print $1}')
+echo "Common Name (CN) using awk: $cn"
+
+# Method 3: Using sed to extract CN
+cn=$(echo "$subject" | sed -n 's/.*CN=\([^/]*\).*/\1/p')
+echo "Common Name (CN) using sed: $cn"
+
