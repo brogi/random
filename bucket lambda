@@ -1,0 +1,46 @@
+import boto3
+import json
+from datetime import datetime, timedelta
+
+s3 = boto3.client('s3')
+cloudtrail = boto3.client('cloudtrail')
+
+def get_last_access_time(bucket_name):
+    response = cloudtrail.lookup_events(
+        LookupAttributes=[
+            {
+                'AttributeKey': 'ResourceName',
+                'AttributeValue': bucket_name
+            },
+        ],
+        MaxResults=1,
+        StartTime=datetime.utcnow() - timedelta(days=365),  # Adjust time range as needed
+        EndTime=datetime.utcnow()
+    )
+
+    if 'Events' in response and response['Events']:
+        return response['Events'][0]['EventTime'].isoformat()
+    else:
+        return 'No access recorded'
+
+def lambda_handler(event, context):
+    buckets = s3.list_buckets()
+    bucket_access_info = []
+
+    for bucket in buckets['Buckets']:
+        bucket_name = bucket['Name']
+        last_access = get_last_access_time(bucket_name)
+        bucket_access_info.append({
+            'BucketName': bucket_name,
+            'LastAccessTime': last_access
+        })
+
+    # Save the report to an S3 bucket
+    report_bucket = 'your-report-bucket-name'
+    report_key = f's3-access-report-{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.json'
+    s3.put_object(Bucket=report_bucket, Key=report_key, Body=json.dumps(bucket_access_info, indent=4))
+
+    return {
+        'statusCode': 200,
+        'body': json.dumps(f"Report saved to s3://{report_bucket}/{report_key}")
+    }
