@@ -1,5 +1,5 @@
 import boto3
-import json
+import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 
 s3 = boto3.client('s3')
@@ -23,6 +23,24 @@ def get_last_access_time(bucket_name):
     else:
         return 'No access recorded'
 
+def create_xml_report(bucket_access_info):
+    # Create the root element
+    root = ET.Element("S3BucketAccessReport")
+
+    # Loop through each bucket and its access time
+    for bucket_info in bucket_access_info:
+        bucket_element = ET.SubElement(root, "Bucket")
+        name_element = ET.SubElement(bucket_element, "BucketName")
+        name_element.text = bucket_info['BucketName']
+
+        access_time_element = ET.SubElement(bucket_element, "LastAccessTime")
+        access_time_element.text = bucket_info['LastAccessTime']
+
+    # Convert the XML tree to a string
+    xml_data = ET.tostring(root, encoding='utf8', method='xml').decode('utf8')
+
+    return xml_data
+
 def lambda_handler(event, context):
     buckets = s3.list_buckets()
     bucket_access_info = []
@@ -35,12 +53,52 @@ def lambda_handler(event, context):
             'LastAccessTime': last_access
         })
 
-    # Save the report to an S3 bucket
+    # Generate XML report
+    xml_report = create_xml_report(bucket_access_info)
+
+    # Save the XML report to an S3 bucket
     report_bucket = 'your-report-bucket-name'
-    report_key = f's3-access-report-{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.json'
-    s3.put_object(Bucket=report_bucket, Key=report_key, Body=json.dumps(bucket_access_info, indent=4))
+    report_key = f's3-access-report-{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.xml'
+    s3.put_object(Bucket=report_bucket, Key=report_key, Body=xml_report, ContentType='application/xml')
 
     return {
         'statusCode': 200,
-        'body': json.dumps(f"Report saved to s3://{report_bucket}/{report_key}")
+        'body': f"Report saved to s3://{report_bucket}/{report_key}"
     }
+
+
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListAllMyBuckets"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::skynet-s3-logs/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "cloudtrail:LookupEvents"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
