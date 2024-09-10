@@ -1,5 +1,6 @@
 import boto3
 import xml.etree.ElementTree as ET
+from datetime import datetime
 
 # Initialize S3 and CloudTrail clients
 s3_client = boto3.client('s3')
@@ -38,16 +39,32 @@ def generate_xml_report(bucket_data):
         last_access_element.text = last_access
     return ET.tostring(root, encoding='unicode')
 
+# Function to upload the XML report to S3
+def upload_to_s3(bucket_name, xml_data):
+    # Format today's date as YYYY-MM-DD
+    today_date = datetime.now().strftime("%Y-%m-%d")
+    file_name = f"S3-Bucket-Logs-{today_date}.xml"  # Filename format
+    s3_client.put_object(
+        Bucket=bucket_name,
+        Key=file_name,
+        Body=xml_data,
+        ContentType='application/xml'
+    )
+    return file_name
+
 # Main Lambda function that will be invoked
 def handler(event, context):
     s3_buckets = get_s3_buckets()
     result = {bucket: get_bucket_last_access_date(bucket) for bucket in s3_buckets}
     xml_report = generate_xml_report(result)
     
-    # Return the XML response
+    # Upload the XML report to S3
+    uploaded_file_name = upload_to_s3('skynet-s3-logs', xml_report)
+    
+    # Return the uploaded file name for reference
     return {
         "statusCode": 200,
-        "body": xml_report,
+        "body": f"XML report uploaded successfully: {uploaded_file_name}",
         "headers": {
             "Content-Type": "application/xml"
         }
