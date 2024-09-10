@@ -12,6 +12,18 @@ def get_s3_buckets():
     response = s3_client.list_buckets()
     return [bucket['Name'] for bucket in response['Buckets']]
 
+# Function to calculate the size of a bucket in MB
+def get_bucket_size(bucket_name):
+    total_size = 0
+    paginator = s3_client.get_paginator('list_objects_v2')
+    
+    for page in paginator.paginate(Bucket=bucket_name):
+        if 'Contents' in page:
+            for obj in page['Contents']:
+                total_size += obj['Size']  # Size in bytes
+
+    return total_size / (1024 * 1024)  # Convert bytes to MB
+
 # Function to get the last access date of an S3 bucket via CloudTrail logs
 def get_bucket_last_access_date(bucket_name):
     events = cloudtrail_client.lookup_events(
@@ -21,25 +33,47 @@ def get_bucket_last_access_date(bucket_name):
                 'AttributeValue': bucket_name
             },
         ],
-        MaxResults=1
+        MaxResults=50  # You can adjust this to retrieve more events
     )
     
     if events['Events']:
-        return events['Events'][0]['EventTime'].strftime("%Y-%m-%d %H:%M:%S")
+        return events['Events']
     else:
-        return "No recent access"
+        return []
+
+# Function to aggregate access by directory from events
+def aggregate_access_by_directory(events):
+    access_summary = {}
+    for event in events:
+        # Extract the bucket name and object key
+        resource_name = event['ResourceName']
+        bucket_name = resource_name.split('/')[2]  # Adjust as needed
+        object_key = resource_name.split('/', 3)[-1]  # Full key
+
+        # Derive the directory from the object key
+        directory = '/'.join(object_key.split('/')[:-1])  # Get prefix
+        last_access_time = event['EventTime'].strftime("%Y-%m-%d %H:%M:%S")
+
+        # Update the access summary
+        if directory not in access_summary:
+            access_summary[directory] = {'last_access': last_access_time, 'bucket': bucket_name}
+        else:
+            access_summary[directory]['last_access'] = max(access_summary[directory]['last_access'], last_access_time)
+
+    return access_summary
 
 # Function to generate the CSV report from bucket data
-def generate_csv_report(bucket_data):
+def generate_csv_report(access_data, bucket_sizes):
     output = io.StringIO()
     writer = csv.writer(output)
 
     # Write header
-    writer.writerow(['Bucket Name', 'Last Access Date'])
+    writer.writerow(['Directory', 'Last Access Date', 'Bucket Size (MB)'])
 
     # Write data rows
-    for bucket_name, last_access in bucket_data.items():
-        writer.writerow([bucket_name, last_access])
+    for directory, info in access_data.items():
+        bucket_size = bucket_sizes.get(info['bucket'], 0)
+        writer.writerow([directory, info['last_access'], bucket_size])
 
     return output.getvalue()
 
@@ -59,8 +93,21 @@ def upload_to_s3(bucket_name, csv_data):
 # Main Lambda function that will be invoked
 def handler(event, context):
     s3_buckets = get_s3_buckets()
-    result = {bucket: get_bucket_last_access_date(bucket) for bucket in s3_buckets}
-    csv_report = generate_csv_report(result)
+    all_access_data = {}
+    bucket_sizes = {}
+
+    # Calculate sizes for each bucket
+    for bucket in s3_buckets:
+        bucket_sizes[bucket] = get_bucket_size(bucket)
+
+    for bucket in s3_buckets:
+        events = get_bucket_last_access_date(bucket)
+        access_data = aggregate_access_by_directory(events)
+
+        # Merge access data from each bucket
+        all_access_data.update(access_data)
+
+    csv_report = generate_csv_report(all_access_data, bucket_sizes)
     
     # Upload the CSV report to S3
     uploaded_file_name = upload_to_s3('sky-s3-logs', csv_report)
