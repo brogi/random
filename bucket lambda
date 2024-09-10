@@ -3,12 +3,12 @@ import csv
 import io
 from datetime import datetime
 
-# Initialize CloudTrail client
+# Initialize S3 and CloudTrail clients
+s3_client = boto3.client('s3')
 cloudtrail_client = boto3.client('cloudtrail')
 
 # Function to list all S3 buckets
 def get_s3_buckets():
-    s3_client = boto3.client('s3')
     response = s3_client.list_buckets()
     return [bucket['Name'] for bucket in response['Buckets']]
 
@@ -69,7 +69,6 @@ def upload_to_s3(bucket_name, csv_data):
     # Format today's date as YYYY-MM-DD
     today_date = datetime.now().strftime("%Y-%m-%d")
     file_name = f"S3-Bucket-Logs-{today_date}.csv"  # Filename format
-    s3_client = boto3.client('s3')
     s3_client.put_object(
         Bucket=bucket_name,
         Key=file_name,
@@ -103,6 +102,7 @@ def handler(event, context):
             "Content-Type": "text/csv"
         }
     }
+
 
 
 
