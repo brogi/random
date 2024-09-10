@@ -1,70 +1,58 @@
 import boto3
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta
 
-s3 = boto3.client('s3')
-cloudtrail = boto3.client('cloudtrail')
+# Initialize S3 and CloudTrail clients
+s3_client = boto3.client('s3')
+cloudtrail_client = boto3.client('cloudtrail')
 
-def get_last_access_time(bucket_name):
-    response = cloudtrail.lookup_events(
+# Function to list all S3 buckets
+def get_s3_buckets():
+    response = s3_client.list_buckets()
+    return [bucket['Name'] for bucket in response['Buckets']]
+
+# Function to get the last access date of an S3 bucket via CloudTrail logs
+def get_bucket_last_access_date(bucket_name):
+    events = cloudtrail_client.lookup_events(
         LookupAttributes=[
             {
                 'AttributeKey': 'ResourceName',
                 'AttributeValue': bucket_name
             },
         ],
-        MaxResults=1,
-        StartTime=datetime.utcnow() - timedelta(days=365),  # Adjust time range as needed
-        EndTime=datetime.utcnow()
+        MaxResults=1
     )
-
-    if 'Events' in response and response['Events']:
-        return response['Events'][0]['EventTime'].isoformat()
+    
+    if events['Events']:
+        return events['Events'][0]['EventTime'].strftime("%Y-%m-%d %H:%M:%S")
     else:
-        return 'No access recorded'
+        return "No recent access"
 
-def create_xml_report(bucket_access_info):
-    # Create the root element
-    root = ET.Element("S3BucketAccessReport")
-
-    # Loop through each bucket and its access time
-    for bucket_info in bucket_access_info:
+# Function to generate the XML report from bucket data
+def generate_xml_report(bucket_data):
+    root = ET.Element("S3Buckets")
+    for bucket_name, last_access in bucket_data.items():
         bucket_element = ET.SubElement(root, "Bucket")
-        name_element = ET.SubElement(bucket_element, "BucketName")
-        name_element.text = bucket_info['BucketName']
+        name_element = ET.SubElement(bucket_element, "Name")
+        name_element.text = bucket_name
+        last_access_element = ET.SubElement(bucket_element, "LastAccess")
+        last_access_element.text = last_access
+    return ET.tostring(root, encoding='unicode')
 
-        access_time_element = ET.SubElement(bucket_element, "LastAccessTime")
-        access_time_element.text = bucket_info['LastAccessTime']
-
-    # Convert the XML tree to a string
-    xml_data = ET.tostring(root, encoding='utf8', method='xml').decode('utf8')
-
-    return xml_data
-
-def lambda_handler(event, context):
-    buckets = s3.list_buckets()
-    bucket_access_info = []
-
-    for bucket in buckets['Buckets']:
-        bucket_name = bucket['Name']
-        last_access = get_last_access_time(bucket_name)
-        bucket_access_info.append({
-            'BucketName': bucket_name,
-            'LastAccessTime': last_access
-        })
-
-    # Generate XML report
-    xml_report = create_xml_report(bucket_access_info)
-
-    # Save the XML report to an S3 bucket
-    report_bucket = 'your-report-bucket-name'
-    report_key = f's3-access-report-{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.xml'
-    s3.put_object(Bucket=report_bucket, Key=report_key, Body=xml_report, ContentType='application/xml')
-
+# Main Lambda function that will be invoked
+def handler(event, context):
+    s3_buckets = get_s3_buckets()
+    result = {bucket: get_bucket_last_access_date(bucket) for bucket in s3_buckets}
+    xml_report = generate_xml_report(result)
+    
+    # Return the XML response
     return {
-        'statusCode': 200,
-        'body': f"Report saved to s3://{report_bucket}/{report_key}"
+        "statusCode": 200,
+        "body": xml_report,
+        "headers": {
+            "Content-Type": "application/xml"
+        }
     }
+
 
 
 {
