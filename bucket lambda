@@ -3,26 +3,14 @@ import csv
 import io
 from datetime import datetime
 
-# Initialize S3 and CloudTrail clients
-s3_client = boto3.client('s3')
+# Initialize CloudTrail client
 cloudtrail_client = boto3.client('cloudtrail')
 
 # Function to list all S3 buckets
 def get_s3_buckets():
+    s3_client = boto3.client('s3')
     response = s3_client.list_buckets()
     return [bucket['Name'] for bucket in response['Buckets']]
-
-# Function to calculate the size of a bucket in MB
-def get_bucket_size(bucket_name):
-    total_size = 0
-    paginator = s3_client.get_paginator('list_objects_v2')
-    
-    for page in paginator.paginate(Bucket=bucket_name):
-        if 'Contents' in page:
-            for obj in page['Contents']:
-                total_size += obj['Size']  # Size in bytes
-
-    return total_size / (1024 * 1024)  # Convert bytes to MB
 
 # Function to get the last access date of an S3 bucket via CloudTrail logs
 def get_bucket_last_access_date(bucket_name):
@@ -63,17 +51,16 @@ def aggregate_access_by_directory(events):
     return access_summary
 
 # Function to generate the CSV report from bucket data
-def generate_csv_report(access_data, bucket_sizes):
+def generate_csv_report(access_data):
     output = io.StringIO()
     writer = csv.writer(output)
 
     # Write header
-    writer.writerow(['Directory', 'Last Access Date', 'Bucket Size (MB)'])
+    writer.writerow(['Directory', 'Last Access Date'])
 
     # Write data rows
     for directory, info in access_data.items():
-        bucket_size = bucket_sizes.get(info['bucket'], 0)
-        writer.writerow([directory, info['last_access'], bucket_size])
+        writer.writerow([directory, info['last_access']])
 
     return output.getvalue()
 
@@ -82,6 +69,7 @@ def upload_to_s3(bucket_name, csv_data):
     # Format today's date as YYYY-MM-DD
     today_date = datetime.now().strftime("%Y-%m-%d")
     file_name = f"S3-Bucket-Logs-{today_date}.csv"  # Filename format
+    s3_client = boto3.client('s3')
     s3_client.put_object(
         Bucket=bucket_name,
         Key=file_name,
@@ -94,11 +82,6 @@ def upload_to_s3(bucket_name, csv_data):
 def handler(event, context):
     s3_buckets = get_s3_buckets()
     all_access_data = {}
-    bucket_sizes = {}
-
-    # Calculate sizes for each bucket
-    for bucket in s3_buckets:
-        bucket_sizes[bucket] = get_bucket_size(bucket)
 
     for bucket in s3_buckets:
         events = get_bucket_last_access_date(bucket)
@@ -107,7 +90,7 @@ def handler(event, context):
         # Merge access data from each bucket
         all_access_data.update(access_data)
 
-    csv_report = generate_csv_report(all_access_data, bucket_sizes)
+    csv_report = generate_csv_report(all_access_data)
     
     # Upload the CSV report to S3
     uploaded_file_name = upload_to_s3('sky-s3-logs', csv_report)
@@ -120,6 +103,7 @@ def handler(event, context):
             "Content-Type": "text/csv"
         }
     }
+
 
 
 {
