@@ -1,5 +1,6 @@
 import boto3
-import xml.etree.ElementTree as ET
+import csv
+import io
 from datetime import datetime
 
 # Initialize S3 and CloudTrail clients
@@ -28,27 +29,30 @@ def get_bucket_last_access_date(bucket_name):
     else:
         return "No recent access"
 
-# Function to generate the XML report from bucket data
-def generate_xml_report(bucket_data):
-    root = ET.Element("S3Buckets")
-    for bucket_name, last_access in bucket_data.items():
-        bucket_element = ET.SubElement(root, "Bucket")
-        name_element = ET.SubElement(bucket_element, "Name")
-        name_element.text = bucket_name
-        last_access_element = ET.SubElement(bucket_element, "LastAccess")
-        last_access_element.text = last_access
-    return ET.tostring(root, encoding='unicode')
+# Function to generate the CSV report from bucket data
+def generate_csv_report(bucket_data):
+    output = io.StringIO()
+    writer = csv.writer(output)
 
-# Function to upload the XML report to S3
-def upload_to_s3(bucket_name, xml_data):
+    # Write header
+    writer.writerow(['Bucket Name', 'Last Access Date'])
+
+    # Write data rows
+    for bucket_name, last_access in bucket_data.items():
+        writer.writerow([bucket_name, last_access])
+
+    return output.getvalue()
+
+# Function to upload the CSV report to S3
+def upload_to_s3(bucket_name, csv_data):
     # Format today's date as YYYY-MM-DD
     today_date = datetime.now().strftime("%Y-%m-%d")
-    file_name = f"S3-Bucket-Logs-{today_date}.xml"  # Filename format
+    file_name = f"S3-Bucket-Logs-{today_date}.csv"  # Filename format
     s3_client.put_object(
         Bucket=bucket_name,
         Key=file_name,
-        Body=xml_data,
-        ContentType='application/xml'
+        Body=csv_data,
+        ContentType='text/csv'
     )
     return file_name
 
@@ -56,20 +60,19 @@ def upload_to_s3(bucket_name, xml_data):
 def handler(event, context):
     s3_buckets = get_s3_buckets()
     result = {bucket: get_bucket_last_access_date(bucket) for bucket in s3_buckets}
-    xml_report = generate_xml_report(result)
+    csv_report = generate_csv_report(result)
     
-    # Upload the XML report to S3
-    uploaded_file_name = upload_to_s3('skynet-s3-logs', xml_report)
+    # Upload the CSV report to S3
+    uploaded_file_name = upload_to_s3('sky-s3-logs', csv_report)
     
     # Return the uploaded file name for reference
     return {
         "statusCode": 200,
-        "body": f"XML report uploaded successfully: {uploaded_file_name}",
+        "body": f"CSV report uploaded successfully: {uploaded_file_name}",
         "headers": {
-            "Content-Type": "application/xml"
+            "Content-Type": "text/csv"
         }
     }
-
 
 
 {
