@@ -24,34 +24,24 @@ def get_bucket_last_access_date(bucket_name):
         MaxResults=50  # You can adjust this to retrieve more events
     )
     
-    if events['Events']:
-        return events['Events']
-    else:
-        return []
+    return events['Events'] if 'Events' in events else []
 
 # Function to aggregate access by directory from events
 def aggregate_access_by_directory(events):
     access_summary = {}
     for event in events:
-        # Extract the bucket name and object key
-        resource_name = event['ResourceName']
-        
+        # Extract the resource name and ensure it's valid
+        resource_name = event.get('ResourceName', '')
         if 'arn:aws:s3:::' in resource_name:
-            bucket_name = resource_name.split(':')[5]  # Extract bucket name
-            object_key = resource_name.split('/', 3)[-1] if '/' in resource_name else ''
-        else:
-            print(f"Unexpected resource name format: {resource_name}")
-            continue  # Skip this event
+            object_key = resource_name.split(':', 5)[-1] if len(resource_name.split(':')) > 5 else ''
+            directory = '/'.join(object_key.split('/')[:-1]) if object_key else 'root'  # Default to 'root' if no object key
+            last_access_time = event['EventTime'].strftime("%Y-%m-%d %H:%M:%S")
 
-        # Derive the directory from the object key
-        directory = '/'.join(object_key.split('/')[:-1]) if object_key else 'root'  # Default to 'root' if no object key
-        last_access_time = event['EventTime'].strftime("%Y-%m-%d %H:%M:%S")
-
-        # Update the access summary
-        if directory not in access_summary:
-            access_summary[directory] = {'last_access': last_access_time, 'bucket': bucket_name}
-        else:
-            access_summary[directory]['last_access'] = max(access_summary[directory]['last_access'], last_access_time)
+            # Update the access summary
+            if directory not in access_summary:
+                access_summary[directory] = {'last_access': last_access_time}
+            else:
+                access_summary[directory]['last_access'] = max(access_summary[directory]['last_access'], last_access_time)
 
     return access_summary
 
