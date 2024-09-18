@@ -1,1 +1,32 @@
+import boto3
+
+def lambda_handler(event, context):
+    ec2 = boto3.client('ec2')
+    
+    # Get all gp2 volumes
+    response = ec2.describe_volumes(
+        Filters=[
+            {
+                'Name': 'volume-type',
+                'Values': ['gp2']
+            }
+        ]
+    )
+    
+    volumes = response['Volumes']
+    
+    for volume in volumes:
+        volume_id = volume['VolumeId']
+        print(f"Modifying volume {volume_id} to gp3")
+        
+        # Modify the volume to gp3
+        ec2.modify_volume(
+            VolumeId=volume_id,
+            VolumeType='gp3'
+        )
+    
+    return {
+        'statusCode': 200,
+        'body': f"Modified {len(volumes)} volumes from gp2 to gp3"
+    }
 
