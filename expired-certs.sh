@@ -43,7 +43,7 @@ for secret in $SECRET_NAMES; do
   fi
 
   # Extract the creation date of the most recent version and strip the time
-  CREATED_TIME=$(echo $METADATA | jq -r '.data.versions | max_by(.version) | .created_time' | cut -d'T' -f1)
+  CREATED_TIME=$(echo $METADATA | jq -r '.data.versions | .[keys_unsorted | max] | .created_time' | cut -d'T' -f1)
   echo "Created time: $CREATED_TIME" # Debugging output
 
   # Compare the created_time with the cutoff date
