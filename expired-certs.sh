@@ -9,8 +9,8 @@ SECRET_PATH="kv/${ENVIRONMENT}/"
 # Output CSV file
 OUTPUT_FILE="secrets_version_dates_${ENVIRONMENT}_18months.csv"
 
-# Get the date 18 months ago (assuming GNU date is available)
-CUT_OFF_DATE=$(date -d "-18 months" +"%Y-%m-%d")
+# Get the date 18 months ago (using BSD date syntax for macOS)
+CUT_OFF_DATE=$(date -v -18m +"%Y-%m-%d")
 
 # Write the CSV header
 echo "Secret Name,Most Recent Version Date" > $OUTPUT_FILE
