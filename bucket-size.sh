@@ -32,8 +32,8 @@ for bucket in $buckets; do
     
     # Calculate sizes for the 1st of each month for the last 6 months
     for i in {0..5}; do
-        date=$(date -d "$i months ago 1st day" +"%Y-%m-%dT00:00:00Z")
-        next_date=$(date -d "$i months ago 2nd day" +"%Y-%m-%dT00:00:00Z")
+        date=$(date -v -"$i"m -v1d +"%Y-%m-%dT00:00:00Z")
+        next_date=$(date -v -"$i"m -v2d +"%Y-%m-%dT00:00:00Z")
         
         size=$(get_bucket_size $bucket $date $next_date)
         
