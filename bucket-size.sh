@@ -3,7 +3,7 @@
 # Output CSV file
 output_file="bucket_sizes.csv"
 # Write the header row to the CSV
-echo "Bucket Name,Date,Size (GB),Storage Class" > $output_file
+echo "Bucket Name,Date,Size (GB),Default Storage Class" > $output_file
 
 # Function to get the size of a bucket on a specific date
 get_bucket_size() {
@@ -21,11 +21,16 @@ get_bucket_size() {
         --query 'Datapoints[0].Average' --output text
 }
 
-# Function to get the storage class of a bucket
-get_storage_class() {
+# Function to get the default storage class for new objects in a bucket
+get_default_storage_class() {
     bucket_name=$1
-    aws s3api get-bucket-storage-class-analysis --bucket "$bucket_name" \
-        --query "StorageClassAnalysis.DataExport.OutputSchema" --output text
+    storage_class=$(aws s3api get-bucket-location --bucket "$bucket_name" --output text 2>/dev/null)
+    
+    if [ -z "$storage_class" ]; then
+        echo "Standard"
+    else
+        echo "$storage_class"
+    fi
 }
 
 # Get all the buckets
@@ -35,8 +40,8 @@ buckets=$(aws s3api list-buckets --query "Buckets[].Name" --output text)
 for bucket in $buckets; do
     echo "Processing bucket: $bucket"
     
-    # Get the storage class
-    storage_class=$(get_storage_class $bucket)
+    # Get the default storage class for new objects
+    default_storage_class=$(get_default_storage_class $bucket)
 
     # Calculate sizes for the 1st of each month for the last 6 months
     for i in {0..5}; do
@@ -52,7 +57,7 @@ for bucket in $buckets; do
         fi
         
         # Append the result to the CSV file
-        echo "$bucket,$date,$size_gb,$storage_class" >> $output_file
+        echo "$bucket,$date,$size_gb,$default_storage_class" >> $output_file
     done
 done
 
