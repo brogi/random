@@ -73,3 +73,41 @@ for function in $functions; do
     # Print the function name and last invocation date in CSV format
     echo "$function,${last_invoked:-Never}"
 done
+
+#!/bin/bash
+
+# Print the CSV header
+echo "Function Name,Last Invoked Time"
+
+# Fetch all Lambda functions
+functions=$(aws lambda list-functions --query 'Functions[*].FunctionName' --output text)
+
+# Loop through each function to get the last invocation time from CloudWatch Logs
+for function in $functions; do
+    # Define the log group name
+    log_group="/aws/lambda/$function"
+
+    # Use CloudWatch Logs Insights to get the most recent invocation time
+    last_invoked=$(aws logs start-query \
+        --log-group-name "$log_group" \
+        --start-time $(date -v-1y +%s) \
+        --end-time $(date +%s) \
+        --query-string "fields @timestamp | sort @timestamp desc | limit 1" \
+        --query 'queryId' \
+        --output text)
+
+    # Wait for the query to complete
+    query_status="Running"
+    while [ "$query_status" == "Running" ] || [ "$query_status" == "Scheduled" ]; do
+        sleep 1
+        query_status=$(aws logs get-query-results --query-id "$last_invoked" --query 'status' --output text)
+    done
+
+    # Get the timestamp of the last invocation
+    timestamp=$(aws logs get-query-results --query-id "$last_invoked" \
+        --query 'results[0][0].value' --output text)
+
+    # Print the function name and last invocation date in CSV format
+    echo "$function,${timestamp:-Never}"
+done
+
