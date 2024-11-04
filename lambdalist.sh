@@ -52,3 +52,24 @@ for function in $functions; do
     # Print the function name and last invocation date in CSV format
     echo "$function,${last_invoked:-Never}"
 done
+
+
+#!/bin/bash
+
+# Print the CSV header
+echo "Function Name,Last Invoked Time"
+
+# Fetch all Lambda functions
+functions=$(aws lambda list-functions --query 'Functions[*].FunctionName' --output text)
+
+# Loop through each function to get the last invocation date
+for function in $functions; do
+    # Use AWS CloudTrail to find the last invocation event for the past year
+    last_invoked=$(aws cloudtrail lookup-events \
+        --lookup-attributes AttributeKey=EventName,AttributeValue=Invoke \
+        --query "Events[?Resources[?ResourceName=='$function']].EventTime | sort(@) | [-1]" \
+        --output text)
+
+    # Print the function name and last invocation date in CSV format
+    echo "$function,${last_invoked:-Never}"
+done
