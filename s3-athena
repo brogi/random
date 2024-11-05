@@ -1,28 +1,37 @@
+DROP TABLE IF EXISTS s3_access_logs;
+
 CREATE EXTERNAL TABLE IF NOT EXISTS s3_access_logs (
-  bucket_owner STRING,
-  bucket STRING,
-  request_datetime STRING,
-  remote_ip STRING,
-  requester STRING,
-  request_id STRING,
-  operation STRING,
-  key STRING,
-  request_uri_operation STRING,
-  request_uri_key STRING,
-  request_uri_http_proto STRING,
-  http_status STRING,
-  error_code STRING,
-  bytes_sent STRING,
-  object_size STRING,
-  total_time STRING,
-  turn_around_time STRING,
-  referrer STRING,
-  user_agent STRING,
-  version_id STRING
+    bucket_owner STRING,
+    bucket STRING,
+    request_time STRING,
+    remote_ip STRING,
+    requester STRING,
+    request_id STRING,
+    operation STRING,
+    key STRING,
+    request_uri STRING,
+    http_status STRING,
+    error_code STRING,
+    bytes_sent BIGINT,
+    object_size BIGINT,
+    total_time BIGINT,
+    turn_around_time BIGINT,
+    referrer STRING,
+    user_agent STRING,
+    version_id STRING
 )
 ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.RegexSerDe'
 WITH SERDEPROPERTIES (
-  'input.regex' = '([^ ]*) ([^ ]*) \\[([^\\]]*)\\] ([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*) \"([^ ]*) ([^ ]*) ([^ ]*)\" ([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*) \"([^ ]*)\" \"([^\"]*)\" ([^ ]*)'
+    'serialization.format' = '1',
+    'input.regex' = '([^ ]*) ([^ ]*) \\[([^\\]]*)\\] ([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*) "([^"]*)" ([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*) "([^"]*)" "([^"]*)" ([^ ]*)$'
 )
-LOCATION 's3://your-log-bucket-name/your-log-bucket-prefix/'
+LOCATION 's3://your-logs-bucket/prefix/' -- Replace with your S3 log bucket and prefix
 TBLPROPERTIES ('has_encrypted_data'='false');
+
+
+SELECT *
+FROM s3_access_logs
+WHERE date_parse(substring(request_time, 2, 20), '%d/%b/%Y:%H:%i:%s') >= current_date - interval '30' day
+ORDER BY request_time DESC;
+
+
