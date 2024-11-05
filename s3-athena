@@ -81,7 +81,7 @@ CREATE EXTERNAL TABLE s3_inventory (
     last_modified_date STRING,
     storage_class STRING
 )
-ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.OpenCSVSerde'
+ROW FORMAT SERDE 'org.apache.hadoop.hive.ql.io.parquet.serde.ParquetSerDe'
 LOCATION 's3://your-inventory-report-bucket/path/'
 TBLPROPERTIES ("skip.header.line.count"="1");
 
