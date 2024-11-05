@@ -65,4 +65,12 @@ ON access_logs.key = inventory.key
 WHERE date_parse(substring(access_logs.request_time, 2, 20), '%d/%b/%Y:%H:%i:%s') >= current_date - interval '30' day
 ORDER BY access_logs.request_time DESC;
 
+SELECT
+    storage_class,
+    COUNT(*) AS object_count,
+    SUM(size) / (1024 * 1024 * 1024) AS total_size_gb
+FROM
+    s3_inventory
+GROUP BY
+    storage_class;
 
