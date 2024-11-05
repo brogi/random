@@ -35,3 +35,34 @@ WHERE date_parse(substring(request_time, 2, 20), '%d/%b/%Y:%H:%i:%s') >= current
 ORDER BY request_time DESC;
 
 
+DROP TABLE IF EXISTS s3_inventory;
+
+CREATE EXTERNAL TABLE IF NOT EXISTS s3_inventory (
+    bucket STRING,
+    key STRING,
+    size BIGINT,
+    last_modified_date STRING,
+    storage_class STRING
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+STORED AS TEXTFILE
+LOCATION 's3://your-inventory-bucket/inventory-prefix/' -- Replace with your S3 inventory bucket and prefix
+TBLPROPERTIES ('skip.header.line.count'='1');
+
+
+
+SELECT 
+    access_logs.request_time,
+    access_logs.key AS accessed_object_key,
+    inventory.last_modified_date,
+    date_diff('day', date_parse(substring(inventory.last_modified_date, 1, 10), '%Y-%m-%d'), current_date) AS object_age_in_days,
+    access_logs.bytes_sent,
+    access_logs.operation
+FROM s3_access_logs AS access_logs
+JOIN s3_inventory AS inventory
+ON access_logs.key = inventory.key
+WHERE date_parse(substring(access_logs.request_time, 2, 20), '%d/%b/%Y:%H:%i:%s') >= current_date - interval '30' day
+ORDER BY access_logs.request_time DESC;
+
+
