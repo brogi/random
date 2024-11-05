@@ -74,3 +74,15 @@ FROM
 GROUP BY
     storage_class;
 
+CREATE EXTERNAL TABLE s3_inventory (
+    bucket_name STRING,
+    key STRING,
+    size BIGINT,
+    last_modified_date STRING,
+    storage_class STRING
+)
+ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.OpenCSVSerde'
+LOCATION 's3://your-inventory-report-bucket/path/'
+TBLPROPERTIES ("skip.header.line.count"="1");
+
+
