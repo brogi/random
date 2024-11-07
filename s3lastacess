@@ -7,6 +7,60 @@ echo "Bucket Name,Last Event Date,Event Type" > "$OUTPUT_FILE"
 # S3 bucket where CloudTrail logs are stored (elis2-cloudtrail bucket)
 cloudtrail_bucket="elis2-cloudtrail"
 
+# Get today's date and the date 5 days ago
+end_date=$(date +%Y-%m-%d)
+start_date=$(date -v -5d +%Y-%m-%d)
+
+# Define the specific CloudTrail log path to focus on, including year and day subdirectories
+log_path="AWSLogs/account/CloudTrail/us-east-1/2024"
+
+# List all S3 buckets in your AWS account
+buckets=$(aws s3api list-buckets --query "Buckets[].Name" --output text)
+
+# Loop through each bucket
+for bucket in $buckets; do
+    echo "Processing bucket: $bucket"
+    
+    # List CloudTrail log files in the CloudTrail S3 bucket, targeting the specific path and day subdirectories
+    log_files=$(aws s3 ls s3://$cloudtrail_bucket/$log_path/ --recursive --query "Contents[?contains(Key, '$bucket') && Key >= 'AWSLogs/$(aws sts get-caller-identity --query Account --output text)/CloudTrail/$start_date'].Key" --output text)
+    
+    if [ -z "$log_files" ]; then
+        echo "No CloudTrail logs found for bucket: $bucket in the last 5 days"
+        continue
+    fi
+    
+    # Download the latest log file for the bucket
+    latest_log_file=$(echo "$log_files" | tail -n 1)
+    aws s3 cp s3://$cloudtrail_bucket/$latest_log_file ./latest_log_file.json
+
+    # Search for GetObject and PutObject events in the CloudTrail logs
+    last_event=$(jq -r '.Records[] | select(.eventName == "GetObject" or .eventName == "PutObject") | {eventName, eventTime, requestParameters: .requestParameters.bucketName}' latest_log_file.json | jq -r "select(.requestParameters.bucketName == \"$bucket\") | .eventTime" | sort | tail -n 1)
+    
+    if [ -z "$last_event" ]; then
+        echo "No read/write events found for bucket: $bucket"
+        continue
+    fi
+
+    # Extract the date from the event and append it to the CSV
+    last_event_date=$(echo "$last_event" | cut -d'T' -f1)
+    event_type=$(echo "$last_event" | jq -r '.eventName')
+
+    echo "$bucket,$last_event_date,$event_type" >> "$OUTPUT_FILE"
+    echo "Recorded last event for $bucket: $last_event_date"
+done
+
+echo "Report generated: $OUTPUT_FILE"
+
+
+#!/bin/bash
+
+# Define output CSV file
+OUTPUT_FILE="s3_bucket_last_access_report.csv"
+echo "Bucket Name,Last Event Date,Event Type" > "$OUTPUT_FILE"
+
+# S3 bucket where CloudTrail logs are stored (elis2-cloudtrail bucket)
+cloudtrail_bucket="elis2-cloudtrail"
+
 # Get today's date and the date 90 days ago
 end_date=$(date +%Y-%m-%d)
 start_date=$(date -v -90d +%Y-%m-%d)
