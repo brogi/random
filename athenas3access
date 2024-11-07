@@ -42,8 +42,7 @@ SELECT
   eventName,
   eventTime
 FROM cloudtrail_logs
-WHERE eventTime >= date_add('day', -5, current_date) 
+WHERE date_parse(eventTime, '%Y-%m-%dT%H:%i:%sZ') >= date_add('day', -5, current_date) 
   AND (eventName = 'GetObject' OR eventName = 'PutObject')
   AND requestParameters LIKE '%bucketName%'
 ORDER BY eventTime DESC;
-
