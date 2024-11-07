@@ -36,3 +36,14 @@ PARTITIONED BY (year STRING, month STRING, day STRING)
 ROW FORMAT SERDE 'org.openx.data.jsonserde.JsonSerDe'
 WITH SERDEPROPERTIES ('serialization.format'='1')
 LOCATION 's3://elis2-cloudtrail/AWSLogs/account/CloudTrail/us-east-1/';
+
+SELECT
+  userIdentity.userName,
+  eventName,
+  eventTime
+FROM cloudtrail_logs
+WHERE eventTime >= date_add('day', -5, current_date) 
+  AND (eventName = 'GetObject' OR eventName = 'PutObject')
+  AND requestParameters LIKE '%bucketName%'
+ORDER BY eventTime DESC;
+
