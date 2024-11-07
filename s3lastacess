@@ -17,6 +17,7 @@ for bucket in $buckets; do
 
     # Query CloudTrail for the last read/write event for the bucket
     last_event=$(aws cloudtrail lookup-events \
+        --trail-name "Default" \
         --lookup-attributes AttributeKey=ResourceName,AttributeValue="$bucket" \
         --start-time "${start_date}T00:00:00Z" --end-time "${end_date}T23:59:59Z" \
         --query "Events[?EventName=='GetObject' || EventName=='PutObject'] | max_by(@, &EventTime)" \
