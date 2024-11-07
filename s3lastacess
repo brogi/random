@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# Set output CSV file
+OUTPUT_FILE="s3_bucket_last_access_report.csv"
+echo "Bucket Name,Last Access Time" > "$OUTPUT_FILE"
+
+# List all S3 buckets in the account
+buckets=$(aws s3api list-buckets --query "Buckets[].Name" --output text)
+
+# Loop through each bucket
+for bucket in $buckets; do
+    echo "Processing bucket: $bucket"
+    
+    # Check if server access logging is enabled for the bucket
+    logging_status=$(aws s3api get-bucket-logging --bucket "$bucket")
+    log_bucket=$(echo "$logging_status" | jq -r '.LoggingEnabled.TargetBucket // empty')
+    
+    if [ -z "$log_bucket" ]; then
+        echo "Logging not enabled for bucket: $bucket"
+        continue
+    fi
+    
+    # Fetch and parse the latest log file for last access time
+    echo "Fetching logs from logging bucket: $log_bucket"
+    latest_log=$(aws s3 ls "s3://$log_bucket/" --recursive | grep "$bucket" | sort | tail -n 1 | awk '{print $4}')
+    
+    if [ -z "$latest_log" ]; then
+        echo "No logs found for bucket: $bucket"
+        continue
+    fi
+
+    # Download the latest log
+    aws s3 cp "s3://$log_bucket/$latest_log" ./latest_log.txt
+    
+    # Parse log for the most recent GET/PUT request (read/write)
+    last_access=$(grep -E "GET|PUT" latest_log.txt | tail -n 1 | awk '{print $1, $2}')
+    
+    if [ -z "$last_access" ]; then
+        echo "No access records found in the log for bucket: $bucket"
+        continue
+    fi
+
+    # Write bucket name and last access time to CSV
+    echo "$bucket,$last_access" >> "$OUTPUT_FILE"
+    echo "Recorded last access time for $bucket: $last_access"
+    
+    # Clean up the downloaded log file
+    rm latest_log.txt
+done
+
+echo "Report generated: $OUTPUT_FILE"
