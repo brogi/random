@@ -2,50 +2,39 @@
 
 # Set output CSV file
 OUTPUT_FILE="s3_bucket_last_access_report.csv"
-echo "Bucket Name,Last Access Time" > "$OUTPUT_FILE"
+echo "Bucket Name,Last Access Date,Event Type" > "$OUTPUT_FILE"
 
 # List all S3 buckets in the account
 buckets=$(aws s3api list-buckets --query "Buckets[].Name" --output text)
 
+# Specify the time period (e.g., past 90 days) to search for events
+start_date=$(date -u -v -90d +"%Y-%m-%d")
+end_date=$(date -u +"%Y-%m-%d")
+
 # Loop through each bucket
 for bucket in $buckets; do
     echo "Processing bucket: $bucket"
+
+    # Query CloudTrail for the last read/write event for the bucket
+    last_event=$(aws cloudtrail lookup-events \
+        --lookup-attributes AttributeKey=ResourceName,AttributeValue="$bucket" \
+        --start-time "${start_date}T00:00:00Z" --end-time "${end_date}T23:59:59Z" \
+        --query "Events[?EventName=='GetObject' || EventName=='PutObject'] | max_by(@, &EventTime)" \
+        --output json)
     
-    # Check if server access logging is enabled for the bucket
-    logging_status=$(aws s3api get-bucket-logging --bucket "$bucket")
-    log_bucket=$(echo "$logging_status" | jq -r '.LoggingEnabled.TargetBucket // empty')
-    
-    if [ -z "$log_bucket" ]; then
-        echo "Logging not enabled for bucket: $bucket"
-        continue
-    fi
-    
-    # Fetch and parse the latest log file for last access time
-    echo "Fetching logs from logging bucket: $log_bucket"
-    latest_log=$(aws s3 ls "s3://$log_bucket/" --recursive | grep "$bucket" | sort | tail -n 1 | awk '{print $4}')
-    
-    if [ -z "$latest_log" ]; then
-        echo "No logs found for bucket: $bucket"
+    # Check if any events were found
+    if [ "$last_event" == "null" ]; then
+        echo "No access events found for bucket: $bucket within the last 90 days"
         continue
     fi
 
-    # Download the latest log
-    aws s3 cp "s3://$log_bucket/$latest_log" ./latest_log.txt
-    
-    # Parse log for the most recent GET/PUT request (read/write)
-    last_access=$(grep -E "GET|PUT" latest_log.txt | tail -n 1 | awk '{print $1, $2}')
-    
-    if [ -z "$last_access" ]; then
-        echo "No access records found in the log for bucket: $bucket"
-        continue
-    fi
+    # Extract the date and event type (read/write)
+    last_access_date=$(echo "$last_event" | jq -r '.EventTime' | cut -d'T' -f1)
+    event_type=$(echo "$last_event" | jq -r '.EventName')
 
-    # Write bucket name and last access time to CSV
-    echo "$bucket,$last_access" >> "$OUTPUT_FILE"
-    echo "Recorded last access time for $bucket: $last_access"
-    
-    # Clean up the downloaded log file
-    rm latest_log.txt
+    # Write bucket name, last access date, and event type to CSV
+    echo "$bucket,$last_access_date,$event_type" >> "$OUTPUT_FILE"
+    echo "Recorded last access date for $bucket: $last_access_date (Event: $event_type)"
 done
 
 echo "Report generated: $OUTPUT_FILE"
