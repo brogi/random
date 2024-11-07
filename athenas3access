@@ -1,12 +1,12 @@
 CREATE EXTERNAL TABLE IF NOT EXISTS cloudtrail_logs (
   eventVersion STRING,
   userIdentity STRUCT<
-    type: STRING,
-    principalId: STRING,
-    arn: STRING,
-    accountId: STRING,
-    accessKeyId: STRING,
-    userName: STRING
+    type:STRING,
+    principalId:STRING,
+    arn:STRING,
+    accountId:STRING,
+    accessKeyId:STRING,
+    userName:STRING
   >,
   eventTime STRING,
   eventSource STRING,
@@ -21,8 +21,15 @@ CREATE EXTERNAL TABLE IF NOT EXISTS cloudtrail_logs (
   eventType STRING,
   recipientAccountId STRING,
   eventCategory STRING,
-  sessionCredential: STRING,
-  resources ARRAY<STRUCT<arn: STRING, accountId: STRING, type: STRING>>,
+  sessionCredential STRUCT<
+    accessKeyId:STRING,
+    secretAccessKey:STRING
+  >,
+  resources ARRAY<STRUCT<
+    arn:STRING,
+    accountId:STRING,
+    type:STRING
+  >>,
   additionalEventData STRING
 )
 PARTITIONED BY (year STRING, month STRING, day STRING)
