@@ -1,3 +1,21 @@
+WITH latest_putobject_events AS (
+  SELECT
+    json_extract_scalar(resource, '$.arn') AS arn,  -- Extract ARN from the resources array
+    MAX(date_parse(eventtime, '%Y-%m-%dT%H:%i:%sZ')) AS last_putobject_date
+  FROM cloudtrail_logs
+  CROSS JOIN UNNEST(resources) AS t (resource)  -- Unnest the resources array
+  WHERE date_parse(eventtime, '%Y-%m-%dT%H:%i:%sZ') >= date_add('day', -90, current_date)
+    AND eventsource = 's3.amazonaws.com'
+    AND eventname = 'PutObject'
+  GROUP BY arn
+)
+SELECT
+  arn,
+  last_putobject_date
+FROM latest_putobject_events
+ORDER BY arn;
+
+
 WITH latest_events AS (
   SELECT
     json_extract_scalar(requestparameters, '$.bucketName') AS bucket_name,
