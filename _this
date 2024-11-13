@@ -1,0 +1,13 @@
+SELECT
+  useridentity.username AS user,
+  eventname AS event,
+  date_parse(eventtime, '%Y-%m-%dT%H:%i:%sZ') AS event_date,
+  requestparameters,
+  sourceipaddress,
+  awsregion
+FROM cloudtrail_logs
+WHERE date_parse(eventtime, '%Y-%m-%dT%H:%i:%sZ') >= date_add('day', -90, current_date)
+  AND eventsource = 's3.amazonaws.com'
+  AND eventname IN ('GetObject', 'PutObject')
+ORDER BY event_date DESC
+LIMIT 100;
