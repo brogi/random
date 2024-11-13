@@ -1,3 +1,22 @@
+WITH latest_events AS (
+  SELECT
+    json_extract_scalar(requestparameters, '$.bucketName') AS bucket_name,
+    eventname AS event,
+    MAX(date_parse(eventtime, '%Y-%m-%dT%H:%i:%sZ')) AS last_event_date
+  FROM cloudtrail_logs
+  WHERE date_parse(eventtime, '%Y-%m-%dT%H:%i:%sZ') >= date_add('day', -90, current_date)
+    AND eventsource = 's3.amazonaws.com'
+    AND eventname IN ('GetObject', 'PutObject')
+  GROUP BY bucket_name, eventname
+)
+SELECT
+  bucket_name,
+  MAX(CASE WHEN event = 'GetObject' THEN last_event_date END) AS last_read_date,
+  MAX(CASE WHEN event = 'PutObject' THEN last_event_date END) AS last_write_date
+FROM latest_events
+GROUP BY bucket_name
+ORDER BY bucket_name;
+
 SELECT
   useridentity.username AS user,
   eventname AS event,
