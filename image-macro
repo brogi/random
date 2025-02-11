@@ -28,12 +28,13 @@ Sub DisplayImage(Target As Range)
 
     ' Remove any existing images in the same cell before inserting a new one
     For Each s In ws1.Shapes
+        ' Check if the image is within the changed cell
         If Not Intersect(s.TopLeftCell, Target) Is Nothing Then
             s.Delete
         End If
     Next s
 
-    ' Attempt to find a matching image in Sheet2
+    ' If there is a matching image in Sheet2, copy it
     On Error Resume Next
     Set img = ws2.Shapes(imgName)
     On Error GoTo 0
@@ -42,17 +43,17 @@ Sub DisplayImage(Target As Range)
     If Not img Is Nothing Then
         img.Copy
         ws1.Paste
-        
+
         ' Get the pasted image
         Set newImg = ws1.Shapes(ws1.Shapes.Count)
 
         ' Maintain aspect ratio
         newImg.LockAspectRatio = msoTrue
-        
+
         ' Calculate scale factors for width and height
         scaleWidth = (Target.Width * 0.9) / newImg.Width
         scaleHeight = (Target.Height * 0.9) / newImg.Height
-        
+
         ' Choose the larger scale factor to make the image fit better
         finalScale = Application.Min(scaleWidth, scaleHeight) ' Ensure image never exceeds cell
 
