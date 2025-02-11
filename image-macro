@@ -1,0 +1,81 @@
+Private Sub Worksheet_Change(ByVal Target As Range)
+    ' Run only if a single cell is changed (avoids unnecessary looping)
+    If Target.Cells.Count > 1 Then Exit Sub
+
+    ' Call the DisplayImage function
+    Application.Run "DisplayImage", Target
+End Sub
+
+
+
+Sub DisplayImage(Target As Range)
+    Dim ws1 As Worksheet, ws2 As Worksheet
+    Dim imgName As String
+    Dim img As Shape
+    
+    ' Define worksheets
+    Set ws1 = ThisWorkbook.Sheets("Sheet1") ' Target sheet where images will be displayed
+    Set ws2 = ThisWorkbook.Sheets("Sheet2") ' Sheet containing images
+
+    ' Get the text in the changed cell
+    imgName = Target.Value
+    
+    ' Remove any existing images in the same cell before inserting a new one
+    Dim s As Shape
+    For Each s In ws1.Shapes
+        If s.TopLeftCell.Address = Target.Address Then s.Delete
+    Next s
+    
+    ' Check if an image with the same name exists in Sheet2
+    On Error Resume Next
+    Set img = ws2.Shapes(imgName)
+    On Error GoTo 0
+    
+    If Not img Is Nothing Then
+        ' Copy image from Sheet2
+        img.Copy
+        ws1.Paste
+        
+        ' Position and resize image in the corresponding cell
+        With ws1.Shapes(ws1.Shapes.Count)
+            .Top = Target.Top
+            .Left = Target.Left
+            .LockAspectRatio = msoTrue ' Maintain proportions
+            .Height = Target.Height * 0.9 ' Slightly smaller than cell
+            .Width = Target.Width * 0.9
+        End With
+    End If
+End Sub
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
