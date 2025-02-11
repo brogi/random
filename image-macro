@@ -28,8 +28,11 @@ Sub DisplayImage(Target As Range)
 
     ' Remove any existing images in the same cell before inserting a new one
     For Each s In ws1.Shapes
-        If s.TopLeftCell.Address = Target.Address Then
-            s.Delete
+        ' Check if the image is within the boundaries of the changed cell
+        If Not Intersect(s.TopLeftCell, Target) Is Nothing Then
+            If Not Intersect(s.BottomRightCell, Target) Is Nothing Then
+                s.Delete
+            End If
         End If
     Next s
 
@@ -53,8 +56,8 @@ Sub DisplayImage(Target As Range)
         scaleWidth = (Target.Width * 0.9) / newImg.Width
         scaleHeight = (Target.Height * 0.9) / newImg.Height
 
-        ' Choose the larger scale factor to make the image fit better
-        finalScale = Application.Min(scaleWidth, scaleHeight) ' Ensure image never exceeds cell
+        ' Choose the largest scale factor (prefer the vertical space first)
+        finalScale = Application.Min(scaleWidth, scaleHeight)
 
         ' Apply scaling
         newImg.Width = newImg.Width * finalScale
