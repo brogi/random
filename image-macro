@@ -17,8 +17,8 @@ Sub DisplayImage(Target As Range)
     Dim scaleFactor As Double
     
     ' Define worksheets
-    Set ws1 = ThisWorkbook.Sheets("Sheet1") ' Where images will appear
-    Set ws2 = ThisWorkbook.Sheets("Sheet2") ' Where images are stored
+    Set ws1 = ThisWorkbook.Sheets("Sheet1") ' Target sheet
+    Set ws2 = ThisWorkbook.Sheets("Sheet2") ' Sheet with images
 
     ' Get the text from the changed cell
     imgName = Target.Value
@@ -33,10 +33,13 @@ Sub DisplayImage(Target As Range)
     Set img = ws2.Shapes(imgName)
     On Error GoTo 0
 
-    ' If image exists, duplicate and move it to Sheet1
+    ' If image exists, duplicate and paste it into Sheet1
     If Not img Is Nothing Then
-        Set newImg = img.Duplicate
-        newImg.Parent = ws1 ' Move duplicated image to Sheet1
+        img.Copy
+        ws1.Paste
+        
+        ' Get the pasted image
+        Set newImg = ws1.Shapes(ws1.Shapes.Count)
 
         ' Position & resize new image
         With newImg
