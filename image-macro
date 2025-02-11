@@ -12,7 +12,9 @@ Sub DisplayImage(Target As Range)
     Dim ws1 As Worksheet, ws2 As Worksheet
     Dim imgName As String
     Dim img As Shape
+    Dim newImg As Shape
     Dim s As Shape
+    Dim scaleFactor As Double
     
     ' Define worksheets
     Set ws1 = ThisWorkbook.Sheets("Sheet1") ' Where images will appear
@@ -31,19 +33,20 @@ Sub DisplayImage(Target As Range)
     Set img = ws2.Shapes(imgName)
     On Error GoTo 0
 
-    ' If image exists, copy and paste it
+    ' If image exists, duplicate and move it to Sheet1
     If Not img Is Nothing Then
-        img.Copy
-        ws1.Paste
+        Set newImg = img.Duplicate
+        newImg.Parent = ws1 ' Move duplicated image to Sheet1
 
-        ' Center the image inside the cell
-        With ws1.Shapes(ws1.Shapes.Count)
+        ' Position & resize new image
+        With newImg
             .LockAspectRatio = msoTrue ' Maintain proportions
             
-            ' Resize image to fit inside the cell (optional, adjust as needed)
-            .Height = Target.Height * 0.9
-            .Width = Target.Width * 0.9
-            
+            ' Calculate scale factor to fit inside cell
+            scaleFactor = Application.Min((Target.Width * 0.9) / .Width, (Target.Height * 0.9) / .Height)
+            .Width = .Width * scaleFactor
+            .Height = .Height * scaleFactor
+
             ' Center image in the cell
             .Top = Target.Top + (Target.Height - .Height) / 2
             .Left = Target.Left + (Target.Width - .Width) / 2
@@ -51,5 +54,8 @@ Sub DisplayImage(Target As Range)
             ' Assign a unique name to avoid conflicts
             .Name = "img_" & Target.Address
         End With
+        
+        ' Hide the text by changing font color to match background
+        Target.Font.Color = Target.Interior.Color ' Makes text invisible
     End If
 End Sub
