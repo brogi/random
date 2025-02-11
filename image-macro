@@ -14,8 +14,11 @@ Sub DisplayImage(Target As Range)
     Dim img As Shape
     Dim newImg As Shape
     Dim s As Shape
-    Dim scaleFactor As Double
+    Dim scaleWidth As Double, scaleHeight As Double, finalScale As Double
     
+    ' Ensure only a single cell is affected
+    If Target.Cells.Count > 1 Then Exit Sub
+
     ' Define worksheets
     Set ws1 = ThisWorkbook.Sheets("Sheet1") ' Target sheet
     Set ws2 = ThisWorkbook.Sheets("Sheet2") ' Sheet with images
@@ -25,7 +28,9 @@ Sub DisplayImage(Target As Range)
 
     ' Remove any existing images in the same cell before inserting a new one
     For Each s In ws1.Shapes
-        If s.TopLeftCell.Address = Target.Address Then s.Delete
+        If Not Intersect(s.TopLeftCell, Target) Is Nothing Then
+            s.Delete
+        End If
     Next s
 
     ' Attempt to find a matching image in Sheet2
@@ -41,23 +46,27 @@ Sub DisplayImage(Target As Range)
         ' Get the pasted image
         Set newImg = ws1.Shapes(ws1.Shapes.Count)
 
-        ' Position & resize new image
-        With newImg
-            .LockAspectRatio = msoTrue ' Maintain proportions
-            
-            ' Calculate scale factor to fit inside cell
-            scaleFactor = Application.Min((Target.Width * 0.9) / .Width, (Target.Height * 0.9) / .Height)
-            .Width = .Width * scaleFactor
-            .Height = .Height * scaleFactor
-
-            ' Center image in the cell
-            .Top = Target.Top + (Target.Height - .Height) / 2
-            .Left = Target.Left + (Target.Width - .Width) / 2
-            
-            ' Assign a unique name to avoid conflicts
-            .Name = "img_" & Target.Address
-        End With
+        ' Maintain aspect ratio
+        newImg.LockAspectRatio = msoTrue
         
+        ' Calculate scale factors for width and height
+        scaleWidth = (Target.Width * 0.9) / newImg.Width
+        scaleHeight = (Target.Height * 0.9) / newImg.Height
+        
+        ' Choose the larger scale factor to make the image fit better
+        finalScale = Application.Min(scaleWidth, scaleHeight) ' Ensure image never exceeds cell
+
+        ' Apply scaling
+        newImg.Width = newImg.Width * finalScale
+        newImg.Height = newImg.Height * finalScale
+
+        ' Center image in the cell
+        newImg.Top = Target.Top + (Target.Height - newImg.Height) / 2
+        newImg.Left = Target.Left + (Target.Width - newImg.Width) / 2
+
+        ' Assign a unique name to avoid conflicts
+        newImg.Name = "img_" & Target.Address
+
         ' Hide the text by changing font color to match background
         Target.Font.Color = Target.Interior.Color ' Makes text invisible
     End If
