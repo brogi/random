@@ -28,13 +28,12 @@ Sub DisplayImage(Target As Range)
 
     ' Remove any existing images in the same cell before inserting a new one
     For Each s In ws1.Shapes
-        ' Check if the image is within the changed cell
-        If Not Intersect(s.TopLeftCell, Target) Is Nothing Then
+        If s.TopLeftCell.Address = Target.Address Then
             s.Delete
         End If
     Next s
 
-    ' If there is a matching image in Sheet2, copy it
+    ' Attempt to find a matching image in Sheet2
     On Error Resume Next
     Set img = ws2.Shapes(imgName)
     On Error GoTo 0
