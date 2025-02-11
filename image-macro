@@ -12,70 +12,44 @@ Sub DisplayImage(Target As Range)
     Dim ws1 As Worksheet, ws2 As Worksheet
     Dim imgName As String
     Dim img As Shape
+    Dim s As Shape
     
     ' Define worksheets
-    Set ws1 = ThisWorkbook.Sheets("Sheet1") ' Target sheet where images will be displayed
-    Set ws2 = ThisWorkbook.Sheets("Sheet2") ' Sheet containing images
+    Set ws1 = ThisWorkbook.Sheets("Sheet1") ' Where images will appear
+    Set ws2 = ThisWorkbook.Sheets("Sheet2") ' Where images are stored
 
-    ' Get the text in the changed cell
+    ' Get the text from the changed cell
     imgName = Target.Value
-    
+
     ' Remove any existing images in the same cell before inserting a new one
-    Dim s As Shape
     For Each s In ws1.Shapes
         If s.TopLeftCell.Address = Target.Address Then s.Delete
     Next s
-    
-    ' Check if an image with the same name exists in Sheet2
+
+    ' Attempt to find a matching image in Sheet2
     On Error Resume Next
     Set img = ws2.Shapes(imgName)
     On Error GoTo 0
-    
+
+    ' If image exists, copy and paste it
     If Not img Is Nothing Then
-        ' Copy image from Sheet2
         img.Copy
         ws1.Paste
-        
-        ' Position and resize image in the corresponding cell
+
+        ' Center the image inside the cell
         With ws1.Shapes(ws1.Shapes.Count)
-            .Top = Target.Top
-            .Left = Target.Left
             .LockAspectRatio = msoTrue ' Maintain proportions
-            .Height = Target.Height * 0.9 ' Slightly smaller than cell
+            
+            ' Resize image to fit inside the cell (optional, adjust as needed)
+            .Height = Target.Height * 0.9
             .Width = Target.Width * 0.9
+            
+            ' Center image in the cell
+            .Top = Target.Top + (Target.Height - .Height) / 2
+            .Left = Target.Left + (Target.Width - .Width) / 2
+            
+            ' Assign a unique name to avoid conflicts
+            .Name = "img_" & Target.Address
         End With
     End If
 End Sub
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
